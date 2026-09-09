@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { api, ApiError } from "./api";
+import { GlobeBoundary } from "./globe-boundary";
+const Globe = lazy(() => import("./globe/globe"));
 
 export function Workspace({ expire }: { expire: () => void }) {
   const [data, setData] = useState<{
@@ -29,8 +31,25 @@ export function Workspace({ expire }: { expire: () => void }) {
       active = false;
     };
   }, [expire, attempt]);
+  if (data && !error)
+    return (
+      <GlobeBoundary>
+        <Suspense
+          fallback={
+            <p className="workspace-loading" role="status">
+              Loading Earth explorer…
+            </p>
+          }
+        >
+          <Globe />
+        </Suspense>
+      </GlobeBoundary>
+    );
   return (
-    <section className="status-panel" aria-labelledby="workspace-heading">
+    <section
+      className="status-panel workspace-loading"
+      aria-labelledby="workspace-heading"
+    >
       <div className="panel-top">
         <h2 id="workspace-heading">Your workspace</h2>
         <span className="badge">SIGNED IN</span>
@@ -41,17 +60,6 @@ export function Workspace({ expire }: { expire: () => void }) {
             {error}
           </p>
           <button onClick={() => setAttempt(attempt + 1)}>Try again</button>
-        </>
-      ) : data ? (
-        <>
-          <div className="connection ready">
-            <span className="indicator" />
-            Ready for takeoff
-          </div>
-          <p>{data.message}</p>
-          <p className="next">
-            UP NEXT<span>{data.nextMilestone}</span>
-          </p>
         </>
       ) : (
         <p role="status">Loading your workspace…</p>

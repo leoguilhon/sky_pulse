@@ -37,7 +37,11 @@ function App() {
     }
   }
   return (
-    <div className="shell">
+    <div
+      className={
+        auth.status === "authenticated" ? "shell explorer-shell" : "shell"
+      }
+    >
       <header>
         <a className="brand" href="/" aria-label="SkyPulse home">
           <span className="brand-icon">✳</span> SkyPulse
@@ -60,19 +64,23 @@ function App() {
         )}
       </header>
       <main>
-        <div className="eyebrow">
-          <span /> A NEW PERSPECTIVE ON AVIATION
-        </div>
-        <h1>
-          The world in motion.
-          <br />
-          <em>A clearer view.</em>
-        </h1>
-        <p className="intro">
-          Explore the world’s air traffic in real time.
-          <br />
-          Your perspective starts here.
-        </p>
+        {auth.status !== "authenticated" && (
+          <>
+            <div className="eyebrow">
+              <span /> A NEW PERSPECTIVE ON AVIATION
+            </div>
+            <h1>
+              The world in motion.
+              <br />
+              <em>A clearer view.</em>
+            </h1>
+            <p className="intro">
+              Explore the world’s air traffic in real time.
+              <br />
+              Your perspective starts here.
+            </p>
+          </>
+        )}
         {auth.status === "loading" && (
           <section className="status-panel">
             <p role="status">Restoring your session…</p>
@@ -99,25 +107,29 @@ function App() {
           <>
             <Workspace expire={auth.expire} />
             {logoutError && (
-              <p className="error" role="alert">
+              <p className="error logout-error" role="alert">
                 {logoutError}
               </p>
             )}
           </>
         )}
       </main>
-      <div className="orbital-art" aria-hidden="true">
-        <div className="orbit" />
-        <div className="planet">
-          <div className="meridian" />
-          <div className="equator" />
-        </div>
-        <span className="orbital-point" />
-      </div>
-      <footer>
-        <span>SKYPULSE / GLOBAL AIR TRAFFIC</span>
-        <span>A world of movement. One perspective.</span>
-      </footer>
+      {auth.status !== "authenticated" && (
+        <>
+          <div className="orbital-art" aria-hidden="true">
+            <div className="orbit" />
+            <div className="planet">
+              <div className="meridian" />
+              <div className="equator" />
+            </div>
+            <span className="orbital-point" />
+          </div>
+          <footer>
+            <span>SKYPULSE / GLOBAL AIR TRAFFIC</span>
+            <span>A world of movement. One perspective.</span>
+          </footer>
+        </>
+      )}
     </div>
   );
 }

@@ -144,7 +144,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
     async (request) => ({
       user: request.session!.user,
       message: "Your SkyPulse workspace is ready.",
-      nextMilestone: "Interactive Earth",
+      nextMilestone: "Live aircraft",
     }),
   );
 }

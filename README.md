@@ -2,7 +2,7 @@
 
 Explore the world's air traffic in real time.
 
-SkyPulse now includes the Phase 1 Docker foundation and Phase 2 authentication: persistent users, secure password hashes, expiring token sessions, login, a protected workspace, and logout. The interactive Earth and live aircraft remain future phases. The orbital illustration is decorative.
+SkyPulse includes the Docker foundation, authentication, and Phase 3 interactive Earth. Sign in to explore a 3D globe with real continent outlines, rotation, zoom, and geographic navigation. Live aircraft remain a future phase; the explorer labels its current exploration-only mode.
 
 ## Start with Docker
 
@@ -74,6 +74,16 @@ Mutating API requests require the exact configured `Origin` plus `X-SkyPulse-Req
 
 Authentication responses use `Cache-Control: no-store`. Invalid credentials return the same error for unknown users and incorrect passwords. Backend failures do not expose connection details or credentials.
 
+## Earth explorer
+
+After login, the globe fills the protected workspace, initially centered on Brazil. Drag to navigate; scroll or pinch to zoom. Presets cover Brazil, Europe, Asia, and a detailed city view of São Paulo. Use the on-screen zoom buttons and reset control, or focus the globe and use arrow keys, `+`/`-`, and `Home`.
+
+The readout shows map-center coordinates and cartographic zoom (0.5-18). Zooming in progressively reveals country and state boundaries, state names, cities, neighborhoods, and roads where available in the map data. MapLibre transitions from a globe overview to a local map as you approach. Labels are placed to reduce overlap. Region transitions respect reduced-motion preferences, and the viewport resizes with the window.
+
+The map uses MapLibre GL JS with the OpenFreeMap Dark vector style, customized for readable labels and state boundaries. OpenFreeMap serves OpenStreetMap/OpenMapTiles tiles, fonts, and symbols directly to the browser. Internet access is required; no API key is needed. Only visible tiles and required detail levels are requested, with a bounded renderer cache. Place names prefer English where available and otherwise retain source geographic names. Attribution stays visible, and style licenses are included in `apps/web/public/maps/`.
+
+WebGL is required. Unsupported graphics, context loss, and loading failures display recovery instructions while keeping logout available. Partial map outages display a reload notice rather than presenting incomplete data as complete. The map and its resources are removed when leaving the workspace. MapLibre loads only after authorization. Map requests never include SkyPulse credentials. To change providers, update the style source/glyph/sprite URLs and the map host allowlist in Nginx; see `apps/web/public/maps/README.md`.
+
 ## Development and quality
 
 ```sh
@@ -118,4 +128,4 @@ The `updated_at` user field is initialized by the schema; future user updates mu
 - `docs/architecture.md`: architectural decisions.
 - `PROJECT_CONTEXT.md`: product direction and phase roadmap.
 
-Phase 3 will add the interactive Earth to the protected workspace. No aviation API calls are made yet. This is a local development environment; production requires TLS termination, deployment secret management, separate migration/runtime database roles, and appropriate login limiting for the deployment size.
+Phase 3 is implemented. Phase 4 will connect a real aviation provider and display aircraft. No aviation API calls are made yet. This is a local development environment; production requires TLS termination, deployment secret management, separate migration/runtime database roles, and appropriate login limiting for the deployment size.
