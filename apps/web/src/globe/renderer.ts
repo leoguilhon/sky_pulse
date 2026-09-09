@@ -34,6 +34,25 @@ export async function createGlobe(
   const style = (await response.json()) as StyleSpecification;
   signal.throwIfAborted();
   style.projection = { type: "globe" };
+  style.sky = {
+    "sky-color": "#060e17",
+    "horizon-color": "#3b7794",
+    "fog-color": "#172e3b",
+    "sky-horizon-blend": 0.15,
+    "horizon-fog-blend": 0.1,
+    "fog-ground-blend": 0,
+    "atmosphere-blend": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      0,
+      0.45,
+      3,
+      0.45,
+      5,
+      0,
+    ],
+  };
   const labels = style.layers.filter((layer) => layer.type === "symbol");
   const originalFilters = new globalThis.Map(
     labels.map((layer) => [layer.id, layer.filter]),
@@ -85,13 +104,36 @@ export async function createGlobe(
     };
     layer.minzoom = Math.max(layer.minzoom ?? 0, minimumZoom[layer.id] ?? 0);
   }
-  // Improve contrast for administrative boundaries and geographic labels.
+  const landColors: Record<string, string> = {
+    water: "#163a49",
+    landcover_ice_shelf: "#82969a",
+    landcover_glacier: "#82969a",
+    landuse_residential: "#3e504e",
+    landcover_wood: "#304c43",
+    landuse_park: "#38564b",
+    building: "#344340",
+    road_area_pier: "#455953",
+  };
+  // Color the Earth while retaining detailed roads and readable boundaries.
   for (const layer of style.layers) {
+    if (layer.type === "background") {
+      layer.paint = { ...layer.paint, "background-color": "#455953" };
+    }
+    if (layer.type === "fill" && landColors[layer.id]) {
+      layer.paint = { ...layer.paint, "fill-color": landColors[layer.id]! };
+      delete layer.paint["fill-pattern"];
+    }
+    if (layer.type === "line" && layer.id === "waterway") {
+      layer.paint = { ...layer.paint, "line-color": "#163a49" };
+    }
+    if (layer.type === "line" && layer.id.startsWith("boundary_country")) {
+      layer.paint = { ...layer.paint, "line-color": "#81958f" };
+    }
     if (layer.id === "boundary_state" && layer.type === "line") {
       layer.paint = {
         ...layer.paint,
-        "line-color": "#849caa",
-        "line-opacity": 0.85,
+        "line-color": "#718983",
+        "line-opacity": 0.65,
         "line-width": [
           "interpolate",
           ["linear"],
