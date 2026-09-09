@@ -1,0 +1,257 @@
+:root {
+  font-family: Inter, "Segoe UI", sans-serif;
+  color: #e8eff7;
+  background: #080f18;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+.shell {
+  min-height: 100svh;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 85% 48%, #11303c66, transparent 55%);
+}
+header,
+footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+}
+header {
+  padding: 30px 5vw;
+  border-bottom: 1px solid #ffffff0d;
+}
+.brand {
+  text-decoration: none;
+  color: #f1f7ff;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -1px;
+}
+.brand-icon {
+  color: #66e4cc;
+  margin-right: 9px;
+}
+.phase,
+.eyebrow,
+.badge,
+.next,
+footer {
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.phase {
+  color: #8497ab;
+}
+main {
+  position: relative;
+  z-index: 2;
+  padding: 80px 7vw 65px;
+  max-width: 850px;
+}
+.eyebrow {
+  color: #73d6c5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.eyebrow span {
+  width: 6px;
+  height: 6px;
+  background: #73d6c5;
+  border-radius: 50%;
+}
+h1 {
+  font-size: clamp(40px, 4.5vw, 68px);
+  letter-spacing: -3px;
+  line-height: 1.12;
+  font-weight: 500;
+  margin: 28px 0 22px;
+}
+h1 em {
+  color: #8395a9;
+  font-style: normal;
+}
+.intro {
+  color: #9aabbd;
+  line-height: 1.8;
+  font-size: 15px;
+}
+.status-panel {
+  margin-top: 38px;
+  max-width: 450px;
+  background: #0d1824ed;
+  border: 1px solid #253543;
+  padding: 24px;
+  border-radius: 12px;
+}
+.panel-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+h2 {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0;
+  color: #bccbdb;
+}
+.badge {
+  font-size: 8px;
+  color: #8da2b6;
+  border: 1px solid #304150;
+  padding: 5px 7px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+.connection {
+  margin-top: 25px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+}
+.indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e7b76c;
+}
+.ready .indicator {
+  background: #66e4cc;
+  box-shadow: 0 0 12px #66e4cc55;
+}
+.status-panel p {
+  font-size: 12px;
+  color: #94a8bb;
+  line-height: 1.7;
+}
+button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  background: #182b39;
+  color: #cee7ec;
+  border: 1px solid #304653;
+  border-radius: 5px;
+  padding: 12px;
+  margin-top: 22px;
+  cursor: pointer;
+}
+button:hover {
+  background: #224050;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+:focus-visible {
+  outline: 2px solid #66e4cc;
+  outline-offset: 4px;
+}
+.next {
+  margin-top: 32px;
+  color: #647b8e;
+  font-size: 9px;
+}
+.next span {
+  display: block;
+  margin-top: 10px;
+  color: #9aabbd;
+  letter-spacing: 0.3px;
+  font-size: 12px;
+}
+.orbital-art {
+  position: absolute;
+  width: 610px;
+  height: 610px;
+  right: -90px;
+  top: 155px;
+  opacity: 0.65;
+  transform: rotate(-24deg);
+}
+.planet {
+  position: absolute;
+  inset: 70px;
+  border: 1px solid #4b938c55;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, #31626c44, #0a1423 65%);
+  box-shadow:
+    inset 10px 2px 45px #5ac6b11a,
+    0 0 90px #45938615;
+  overflow: hidden;
+}
+.meridian {
+  position: absolute;
+  inset: 0 100px;
+  border: 1px solid #559d9544;
+  border-radius: 50%;
+}
+.equator {
+  position: absolute;
+  inset: 170px 0;
+  border: 1px solid #559d9544;
+  border-radius: 50%;
+}
+.orbit {
+  position: absolute;
+  inset: 15px;
+  border: 1px solid #5fa99a25;
+  border-radius: 50%;
+}
+.orbital-point {
+  position: absolute;
+  left: 20px;
+  top: 230px;
+  width: 7px;
+  height: 7px;
+  background: #80edcc;
+  border-radius: 50%;
+  box-shadow: 0 0 20px #80edcc;
+}
+footer {
+  padding: 24px 5vw;
+  border-top: 1px solid #ffffff0d;
+  color: #61768a;
+  font-size: 9px;
+}
+footer span:last-child {
+  letter-spacing: 0.3px;
+}
+@media (max-width: 1050px) {
+  .orbital-art {
+    right: -300px;
+    opacity: 0.3;
+  }
+}
+@media (max-width: 600px) {
+  header {
+    padding: 24px;
+  }
+  .phase {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+  main {
+    padding: 55px 24px;
+  }
+  h1 {
+    letter-spacing: -2px;
+  }
+  .orbital-art {
+    right: -450px;
+  }
+  footer {
+    padding: 24px;
+    gap: 20px;
+    align-items: flex-start;
+  }
+}
