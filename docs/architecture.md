@@ -1,4 +1,4 @@
-# Phase 1 architecture
+# SkyPulse architecture
 
 ## Decision
 
@@ -16,6 +16,20 @@ Application images separate build and runtime stages and use non-root runtime us
 
 ## Persistence and boundaries
 
-The initial schema prepares a minimal user record for Phase 2. A small SQL migration runner tracks checksums and applies migrations transactionally with a database lock. Readiness checks the user table as well as connectivity.
+The user schema is extended in Phase 2 with persistent token sessions. A small SQL migration runner tracks checksums and applies migrations transactionally with a database lock. Readiness checks both tables and connectivity.
 
 Future aviation adapters will live on the server and normalize provider payloads before exposing them to the browser. Shared flight contracts will be introduced with actual provider requirements. The Earth renderer remains a Phase 3 decision. No sample aircraft are presented as live data.
+
+## Phase 2: authentication
+
+Use opaque 256-bit session tokens instead of JWTs. PostgreSQL already exists, so storing token digests and expiration timestamps provides immediate logout revocation with no signing secret, refresh-token service, or additional infrastructure. Each protected request validates its session against the database. The fixed lifetime defaults to eight hours, and sessions survive application restarts. Expired rows are cleaned on successful login.
+
+Store tokens in host-only HttpOnly, SameSite=Strict cookies. HTTPS origins use Secure cookies with a __Host- prefix. An exact configured Origin and a custom request header protect writes, including login and logout. Same-origin proxying avoids CORS. No token is stored in localStorage or returned in JSON. This follows the [OWASP session management guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
+
+Use the [Node.js scrypt API](https://nodejs.org/api/crypto.html#cryptoscryptpassword-salt-keylen-options-callback) with random 16-byte salts and N=32768, r=8, p=3. Password provisioning accepts 12-128 characters; login accepts existing passwords up to that limit. Unknown accounts verify against a dummy hash to reduce user-enumeration timing differences. A conservative shared login limit bounds hashing load for the initial single-instance environment.
+
+Provision accounts via a local CLI with hidden password input or JSON over stdin. No seed credentials are committed, and duplicate provisioning never resets an account. There is no public registration or complex permission system.
+
+The frontend gates the /app view on a validated session. It restores sessions after reload, checks on focus and periodically, and removes protected content when a session expires. Network failures are recoverable without displaying protected content. The backend, rather than the frontend route, remains the authorization boundary. The reusable session pre-handler guards both the session endpoint and initial workspace endpoint.
+
+API tests cover credentials, cookie properties, CSRF checks, token rotation, expiration, logout revocation, rate limiting, and storage failures. Playwright tests exercise real browser cookies and PostgreSQL using disposable accounts. Scaling beyond one API process will require revisiting the shared in-memory login limiter; this phase intentionally does not add Redis.

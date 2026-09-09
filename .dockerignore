@@ -7,3 +7,6 @@ node_modules
 coverage
 *.log
 .npm-cache
+playwright-report
+test-results
+.playwright

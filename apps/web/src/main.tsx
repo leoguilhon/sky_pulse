@@ -1,52 +1,63 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Login } from "./login";
+import { Workspace } from "./workspace";
+import { useAuth } from "./use-auth";
 import "./styles.css";
-type Status = "checking" | "ready" | "unavailable" | "network-error";
+
 function App() {
-  const [status, setStatus] = useState<Status>("checking");
-  const [attempt, setAttempt] = useState(0);
+  const auth = useAuth();
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
   useEffect(() => {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 5000);
-    let active = true;
-    setStatus("checking");
-    fetch("/api/health/ready", { signal: controller.signal, cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return "unavailable" as const;
-        const data: unknown = await response.json();
-        return typeof data === "object" &&
-          data !== null &&
-          "status" in data &&
-          data.status === "ok"
-          ? ("ready" as const)
-          : ("unavailable" as const);
-      })
-      .then((next) => {
-        if (active) setStatus(next);
-      })
-      .catch(() => {
-        if (active) setStatus("network-error");
-      })
-      .finally(() => window.clearTimeout(timeout));
-    return () => {
-      active = false;
-      controller.abort();
-      window.clearTimeout(timeout);
-    };
-  }, [attempt]);
-  const labels: Record<Status, string> = {
-    checking: "Checking services",
-    ready: "All systems ready",
-    unavailable: "Service unavailable",
-    "network-error": "Unable to reach the server",
-  };
+    if (auth.status !== "authenticated" && auth.status !== "anonymous") return;
+    const syncPath = () =>
+      window.history.replaceState(
+        null,
+        "",
+        auth.status === "authenticated" ? "/app" : "/login",
+      );
+    syncPath();
+    window.addEventListener("popstate", syncPath);
+    return () => window.removeEventListener("popstate", syncPath);
+  }, [auth.status]);
+  async function logout() {
+    setLogoutBusy(true);
+    setLogoutError("");
+    try {
+      await auth.logout();
+    } catch (error) {
+      setLogoutError(
+        error instanceof Error
+          ? error.message
+          : "Unable to sign out. Please try again.",
+      );
+    } finally {
+      setLogoutBusy(false);
+    }
+  }
   return (
     <div className="shell">
       <header>
         <a className="brand" href="/" aria-label="SkyPulse home">
           <span className="brand-icon">✳</span> SkyPulse
         </a>
-        <span className="phase">PHASE 01 / FOUNDATION</span>
+        {auth.session ? (
+          <div className="account">
+            <span>{auth.session.user.email}</span>
+            <button
+              className="logout"
+              onClick={() => {
+                void logout();
+              }}
+              disabled={logoutBusy}
+            >
+              {logoutBusy ? "Signing out…" : "Sign out"}
+            </button>
+          </div>
+        ) : (
+          <span className="phase">EXPLORE. CONNECT. DISCOVER.</span>
+        )}
       </header>
       <main>
         <div className="eyebrow">
@@ -60,34 +71,40 @@ function App() {
         <p className="intro">
           Explore the world’s air traffic in real time.
           <br />
-          The journey starts with a connected foundation.
+          Your perspective starts here.
         </p>
-        <section className="status-panel" aria-labelledby="status-heading">
-          <div className="panel-top">
-            <h2 id="status-heading">Environment status</h2>
-            <span className="badge">DEVELOPMENT</span>
-          </div>
-          <div className={`connection ${status}`} role="status">
-            <span className="indicator" />
-            {labels[status]}
-          </div>
-          <p>
-            {status === "ready"
-              ? "The web application, API, and database are connected."
-              : status === "checking"
-                ? "Connecting to the API and checking the database."
-                : "Check the Docker services, then try connecting again."}
-          </p>
-          <button
-            onClick={() => setAttempt((value) => value + 1)}
-            disabled={status === "checking"}
-          >
-            Check connection <span aria-hidden="true">↗</span>
-          </button>
-        </section>
-        <p className="next">
-          UP NEXT <span>Secure access → Interactive Earth → Live aircraft</span>
-        </p>
+        {auth.status === "loading" && (
+          <section className="status-panel">
+            <p role="status">Restoring your session…</p>
+          </section>
+        )}
+        {auth.status === "error" && (
+          <section className="status-panel">
+            <p className="error" role="alert">
+              {auth.notice}
+            </p>
+            <button
+              onClick={() => {
+                void auth.restore();
+              }}
+            >
+              Try again
+            </button>
+          </section>
+        )}
+        {auth.status === "anonymous" && (
+          <Login login={auth.login} notice={auth.notice} />
+        )}
+        {auth.status === "authenticated" && (
+          <>
+            <Workspace expire={auth.expire} />
+            {logoutError && (
+              <p className="error" role="alert">
+                {logoutError}
+              </p>
+            )}
+          </>
+        )}
       </main>
       <div className="orbital-art" aria-hidden="true">
         <div className="orbit" />
@@ -99,7 +116,7 @@ function App() {
       </div>
       <footer>
         <span>SKYPULSE / GLOBAL AIR TRAFFIC</span>
-        <span>Foundation first. Exploration ahead.</span>
+        <span>A world of movement. One perspective.</span>
       </footer>
     </div>
   );

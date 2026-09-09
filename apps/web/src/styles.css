@@ -157,6 +157,56 @@ button:disabled {
   outline: 2px solid #66e4cc;
   outline-offset: 4px;
 }
+label {
+  display: block;
+  color: #bccbdb;
+  font-size: 12px;
+  margin: 20px 0 8px;
+}
+input {
+  width: 100%;
+  border: 1px solid #304653;
+  border-radius: 5px;
+  padding: 12px;
+  color: #e8eff7;
+  background: #09131e;
+  font: inherit;
+  font-size: 14px;
+}
+input:disabled {
+  opacity: 0.6;
+}
+.status-panel .error,
+.error {
+  color: #ffb9ae;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.status-panel .notice {
+  color: #a7dfd5;
+}
+.status-panel .access-note {
+  margin-top: 20px;
+  font-size: 11px;
+}
+.account {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+}
+.account > span {
+  font-size: 12px;
+  color: #9aabbd;
+  max-width: 35vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.logout {
+  margin: 0;
+  width: auto;
+  white-space: nowrap;
+}
 .next {
   margin-top: 32px;
   color: #647b8e;

@@ -21,6 +21,8 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       DB_HOST: database
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:${WEB_PORT:-8080}}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
     depends_on:
       database:
         condition: service_healthy

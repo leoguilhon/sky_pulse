@@ -3,3 +3,6 @@ dist
 package-lock.json
 PROJECT_CONTEXT.md
 .npm-cache
+playwright-report
+test-results
+.playwright
