@@ -98,7 +98,7 @@ export async function createGlobe(
       place_city_large: 4,
       place_city: 6,
       place_town: 8,
-      place_village: 10,
+      place_village: 12,
       place_suburb: 11,
       place_other: 12,
     };
@@ -114,7 +114,7 @@ export async function createGlobe(
     building: "#344340",
     road_area_pier: "#455953",
   };
-  // Color the Earth while retaining detailed roads and readable boundaries.
+  // Keep the basemap quiet so live aircraft can own the visual hierarchy.
   for (const layer of style.layers) {
     if (layer.type === "background") {
       layer.paint = { ...layer.paint, "background-color": "#455953" };
@@ -124,16 +124,24 @@ export async function createGlobe(
       delete layer.paint["fill-pattern"];
     }
     if (layer.type === "line" && layer.id === "waterway") {
-      layer.paint = { ...layer.paint, "line-color": "#163a49" };
+      layer.paint = {
+        ...layer.paint,
+        "line-color": "#294c55",
+        "line-opacity": 0.4,
+      };
     }
     if (layer.type === "line" && layer.id.startsWith("boundary_country")) {
-      layer.paint = { ...layer.paint, "line-color": "#81958f" };
+      layer.paint = {
+        ...layer.paint,
+        "line-color": "#8da19b",
+        "line-opacity": 0.42,
+      };
     }
     if (layer.id === "boundary_state" && layer.type === "line") {
       layer.paint = {
         ...layer.paint,
-        "line-color": "#718983",
-        "line-opacity": 0.65,
+        "line-color": "#7b8f89",
+        "line-opacity": 0.28,
         "line-width": [
           "interpolate",
           ["linear"],
@@ -147,12 +155,61 @@ export async function createGlobe(
         ],
       };
     }
-    if (layer.id.startsWith("place_") && layer.type === "symbol") {
+    if (layer.type === "line" && layer.id.startsWith("highway_")) {
+      const isCasing = layer.id.endsWith("_casing");
+      const isInner = layer.id.endsWith("_inner");
+      const isPath = layer.id === "highway_path";
+      if (isPath || layer.id === "highway_minor") {
+        layer.minzoom = Math.max(layer.minzoom ?? 0, isPath ? 14 : 12.5);
+      }
       layer.paint = {
         ...layer.paint,
-        "text-color": layer.id === "place_state" ? "#b3d8ce" : "#e0e9ef",
-        "text-halo-color": "#121a22",
-        "text-halo-width": 1.5,
+        "line-color": isCasing ? "#344a48" : isInner ? "#82938e" : "#71837d",
+        "line-opacity": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          11,
+          isCasing ? 0.07 : isInner ? 0.14 : isPath ? 0.05 : 0.08,
+          15,
+          isCasing ? 0.12 : isInner ? 0.22 : isPath ? 0.1 : 0.16,
+          18,
+          isCasing ? 0.16 : isInner ? 0.28 : isPath ? 0.16 : 0.22,
+        ],
+      };
+    }
+    if (layer.type === "line" && layer.id === "road_pier") {
+      layer.paint = {
+        ...layer.paint,
+        "line-color": "#70827c",
+        "line-opacity": 0.1,
+      };
+    }
+    if (layer.type === "line" && layer.id.startsWith("railway")) {
+      layer.paint = {
+        ...layer.paint,
+        "line-color": layer.id.endsWith("dashline") ? "#364d4a" : "#758680",
+        "line-opacity": layer.id.endsWith("dashline") ? 0.1 : 0.08,
+      };
+    }
+    if (layer.type === "line" && layer.id.startsWith("aeroway-")) {
+      layer.paint = {
+        ...layer.paint,
+        "line-color": layer.id.endsWith("casing") ? "#3a504e" : "#7a8b85",
+        "line-opacity": layer.id.endsWith("casing") ? 0.12 : 0.16,
+      };
+    }
+    if (layer.id.startsWith("place_") && layer.type === "symbol") {
+      const isCountry = layer.id.startsWith("place_country");
+      const isCity =
+        layer.id === "place_city_large" || layer.id === "place_city";
+      const isLocal = layer.id === "place_suburb" || layer.id === "place_other";
+      layer.paint = {
+        ...layer.paint,
+        "text-color": layer.id === "place_state" ? "#9caeaa" : "#afbfbc",
+        "text-opacity": isCountry ? 0.66 : isCity ? 0.56 : 0.42,
+        "text-halo-color": "#40534f",
+        "text-halo-width": isLocal ? 1 : 0.8,
       };
       layer.layout = {
         ...layer.layout,
@@ -165,6 +222,28 @@ export async function createGlobe(
         ],
       };
       if (layer.id === "place_state") layer.layout["text-size"] = 12;
+    }
+    if (layer.type === "symbol" && layer.id.startsWith("highway_name")) {
+      layer.minzoom = Math.max(layer.minzoom ?? 0, 12);
+      layer.paint = {
+        ...layer.paint,
+        "text-color": "#b2c0bd",
+        "text-opacity": 0.44,
+        "text-halo-color": "#354a46",
+        "text-halo-width": 1,
+      };
+    }
+    if (layer.type === "symbol" && layer.id === "water_name") {
+      layer.paint = {
+        ...layer.paint,
+        "text-color": "#83a3aa",
+        "text-opacity": 0.58,
+        "text-halo-color": "#173944",
+        "text-halo-width": 1,
+      };
+    }
+    if (layer.type === "symbol" && layer.id.startsWith("road_oneway")) {
+      layer.paint = { ...layer.paint, "icon-opacity": 0.3 };
     }
   }
   let map: Map;
