@@ -33,6 +33,22 @@ const textAt = (state: unknown[], index: number) => {
   return trimmed || null;
 };
 
+const categories: Record<number, string> = {
+  2: "light",
+  3: "small",
+  4: "large",
+  5: "high-vortex",
+  6: "heavy",
+  7: "high-performance",
+  8: "rotorcraft",
+  9: "glider",
+  10: "lighter-than-air",
+  11: "parachutist",
+  12: "ultralight",
+  14: "uav",
+  15: "spacecraft",
+};
+
 export function normalizeOpenSkyState(
   value: unknown,
   observedAtSeconds: number,
@@ -56,9 +72,14 @@ export function normalizeOpenSkyState(
   const timePosition = numberAt(value, 3);
   const lastContact = numberAt(value, 4);
   const updatedSeconds = timePosition ?? lastContact ?? observedAtSeconds;
+  const categoryCode = numberAt(value, 17);
+  // Surface vehicles and obstacles must not appear as aircraft.
+  if (categoryCode !== null && categoryCode >= 16 && categoryCode <= 20)
+    return null;
   return {
     id,
     callsign: textAt(value, 1),
+    category: categoryCode === null ? null : (categories[categoryCode] ?? null),
     latitude,
     longitude,
     altitudeMeters: numberAt(value, 7) ?? numberAt(value, 13),
@@ -172,6 +193,7 @@ export class OpenSkyProvider implements AircraftProvider {
   ) {
     const url = new URL(`${this.baseUrl}/states/all`);
     url.search = new URLSearchParams({
+      extended: "1",
       lamin: String(bounds.minimumLatitude),
       lamax: String(bounds.maximumLatitude),
       lomin: String(bounds.minimumLongitude),

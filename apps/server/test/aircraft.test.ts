@@ -32,6 +32,7 @@ test("OpenSky state vectors normalize without leaking provider arrays", () => {
   assert.deepEqual(normalizeOpenSkyState(state, 1_700_000_000), {
     id: "e490a1",
     callsign: "GLO123",
+    category: null,
     latitude: -23.55,
     longitude: -46.63,
     altitudeMeters: 10_200,
@@ -67,6 +68,7 @@ test("OpenSky requests the configured region and drops positions that are missin
   assert.equal(result.aircraft.length, 1);
   assert.equal(result.remainingCredits, 399);
   assert.equal(requested!.pathname, "/api/states/all");
+  assert.equal(requested!.searchParams.get("extended"), "1");
   assert.equal(requested!.searchParams.get("lamin"), "-25.5");
   assert.equal(requested!.searchParams.get("lamax"), "-20.5");
   assert.equal(requested!.searchParams.get("lomin"), "-49.5");
@@ -170,4 +172,32 @@ test("provider retry windows suppress repeated external requests", async () => {
       error instanceof AircraftProviderError && error.retryAfterSeconds === 59,
   );
   assert.equal(calls, 1);
+});
+
+test("extended categories preserve type information without guessing missing metadata", () => {
+  for (const [code, expected] of [
+    [2, "light"],
+    [4, "large"],
+    [6, "heavy"],
+    [8, "rotorcraft"],
+    [9, "glider"],
+    [14, "uav"],
+    [0, null],
+    [1, null],
+    [13, null],
+    [99, null],
+    [2.5, null],
+  ] as const) {
+    const extended: unknown[] = [...state];
+    extended[17] = code;
+    assert.equal(
+      normalizeOpenSkyState(extended, 1_700_000_000)?.category,
+      expected,
+    );
+  }
+  for (const code of [16, 17, 18, 19, 20]) {
+    const extended: unknown[] = [...state];
+    extended[17] = code;
+    assert.equal(normalizeOpenSkyState(extended, 1_700_000_000), null);
+  }
 });

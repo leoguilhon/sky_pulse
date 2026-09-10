@@ -2,7 +2,7 @@
 
 Explore the world's air traffic in real time.
 
-SkyPulse includes the Docker foundation, authentication, an interactive Earth, and Phase 4 live aircraft. Sign in to explore a 3D globe with real continent outlines, rotation, zoom, geographic navigation, and a live regional aircraft snapshot from OpenSky Network.
+SkyPulse includes the Docker foundation, authentication, an interactive Earth, live aircraft, and Phase 5 aircraft inspection. Sign in to explore a 3D globe with real continent outlines, rotation, zoom, geographic navigation, and a live regional aircraft snapshot from OpenSky Network.
 
 ## Start with Docker
 
@@ -93,9 +93,39 @@ The authenticated `GET /api/aircraft` endpoint loads a live snapshot for a 5 × 
 
 The browser never contacts OpenSky or receives provider credentials. The server supports anonymous OpenSky access by default and optional OAuth client credentials through `OPENSKY_CLIENT_ID` and `OPENSKY_CLIENT_SECRET`. OAuth access tokens are cached until shortly before expiry and refreshed once after an unauthorized response.
 
-Snapshots are shared in memory across users for five minutes by default. This keeps the 25-square-degree query at one OpenSky credit and prevents page loads from multiplying external requests. Concurrent cache misses share the same request. Provider `429` cooldowns are honored, and the last snapshot can be served as explicitly stale for up to 15 minutes during a rate limit or temporary outage. A missing or failed feed does not prevent geographic exploration. Phase 4 intentionally loads a snapshot on workspace entry or manual retry; periodic updates and movement interpolation belong to Phase 6.
+Snapshots are shared in memory across users for five minutes by default. This keeps the 25-square-degree query at one OpenSky credit and prevents page loads from multiplying external requests. Concurrent cache misses share the same request. Provider `429` cooldowns are honored, and the last snapshot can be served as explicitly stale for up to 15 minutes during a rate limit or temporary outage. A missing or failed feed does not prevent geographic exploration. The browser refreshes its view every 30 seconds; OpenSky requests still use the shared five-minute cache. This also picks up newly imported aircraft metadata. Movement interpolation remains a future milestone.
 
 OpenSky documents its live API for research and non-commercial use. Review the [OpenSky API documentation](https://openskynetwork.github.io/opensky-api/) and applicable terms before production or commercial deployment. Aircraft attribution is displayed in the workspace.
+
+### Aircraft inspection and shapes (Phase 5)
+
+Click an aircraft or use **Inspect aircraft** to select it. The gold silhouette and ring identify the selection. Click empty map space, press Escape while focused on the globe or inspector, or close the panel to clear it. Selection uses the existing position snapshot and queries flight-route metadata separately by the selected aircraft's callsign.
+
+The panel shows callsign (ICAO24 fallback), altitude in feet, ground speed in knots, heading / true track in degrees, vertical rate in feet per minute, coordinates, registration country, available model/type information, and the UTC position timestamp. Missing values are explicitly unavailable and stale snapshots retain their warning. The country is inferred from the transponder address, not the flight's departure country.
+
+The [OpenSky state-vector API](https://openskynetwork.github.io/opensky-api/rest.html) is requested with `extended=1`. Reported categories distinguish light, small, large, heavy, high-performance, rotorcraft, glider, lighter-than-air, and unmanned aircraft. Surface vehicles and obstacles are excluded. Shapes follow the reported true track; missing track uses north as a display fallback without inventing a heading in the panel. Gray indicates ground status; the legend explains the symbols.
+
+The server enriches OpenSky positions from a persistent PostgreSQL catalog: ICAO24 maps to registration, type code, model and operator; a type catalog supplies ICAO airframe/engine descriptors and wake category. The renderer uses these characteristics as well as recognized type codes to distinguish single-engine, multi-engine propeller, jet, heavy, and rotorcraft silhouettes. Missing or ambiguous metadata remains unknown rather than being guessed from speed or callsign.
+
+### Aircraft catalog and flight routes
+
+The catalog is downloaded from [tar1090-db](https://github.com/wiedehopf/tar1090-db) and [Mictronics type data](https://github.com/Mictronics/readsb-protobuf/blob/dev/webapp/src/db/types.json). It contains over 600,000 aircraft records and thousands of aircraft types. The first server startup imports it in the background. Imports refresh after seven days, checked hourly; errors retain the previous catalog and retry at the next check. Aircraft appear immediately with available feed categories, then gain details on a subsequent refresh. Database import is atomic, validates identifiers/structure/minimum record counts, and uses bounded downloads and batched inserts. No external data files are bundled into the frontend.
+
+To force a catalog refresh:
+
+```bash
+docker compose exec server node apps/server/dist/aircraft/sync-catalog.js
+```
+
+To inspect import status:
+
+```bash
+docker compose exec database psql -U skypulse -d skypulse -c "SELECT * FROM aircraft_catalog_sync;"
+```
+
+Flight inspection shows origin and destination airport codes, names, cities, optional intermediate airport, airline, and flight number using the [adsbdb callsign API](https://github.com/mrjackwills/adsbdb). These are **callsign route references**, not confirmed live flight plans: reused callsigns, multi-leg services, diversions and charter/private flights may differ or have no result. The UI explicitly labels this and distinguishes absent callsigns, missing routes, and temporary lookup failures.
+
+`GET /api/aircraft/:icao24/route` requires authentication and resolves the callsign from the server's current regional snapshot. It does not accept arbitrary callsigns from the browser. Lookups have a seven-second timeout, at most two concurrent requests, a maximum of 30 requests/minute, shared in-flight requests, and a bounded memory cache (six hours for matches, one hour for misses, 30 seconds for errors). HTTP 429 cooldowns are honored globally. Route responses use `Cache-Control: no-store`; the server's short-lived lookup cache is not persisted or incorporated into the aircraft database. The upstream credits David Taylor and Jim Mason for route data and restricts copying its route database; SkyPulse does not mirror that database. Route-provider failures do not affect aircraft positions or catalog access.
 
 ## Development and quality
 
@@ -141,4 +171,4 @@ The `updated_at` user field is initialized by the schema; future user updates mu
 - `docs/architecture.md`: architectural decisions.
 - `PROJECT_CONTEXT.md`: product direction and phase roadmap.
 
-Phase 4 is implemented with a provider abstraction, normalized regional OpenSky data, shared rate-aware caching, graceful feed states, and batched aircraft rendering. Phase 5 will add aircraft selection and inspection. This is a local development environment; production requires TLS termination, deployment secret management, separate migration/runtime database roles, validation of provider licensing for the intended use, and appropriate login limiting for the deployment size.
+Phase 4 is implemented with a provider abstraction, normalized regional OpenSky data, shared rate-aware caching, graceful feed states, and batched aircraft rendering. Phase 5 adds aircraft selection, an inspection panel, heading-oriented category silhouettes, and a gold selection highlight. This is a local development environment; production requires TLS termination, deployment secret management, separate migration/runtime database roles, validation of provider licensing for the intended use, and appropriate login limiting for the deployment size.

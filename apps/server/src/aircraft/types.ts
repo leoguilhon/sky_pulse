@@ -18,6 +18,15 @@ export const SAO_PAULO_REGION = {
 export interface AircraftPosition {
   id: string;
   callsign: string | null;
+  category: string | null;
+  model?: string | null;
+  typeCode?: string | null;
+  registration?: string | null;
+  operator?: string | null;
+  typeDescription?: string | null;
+  wakeCategory?: string | null;
+  metadataSource?: string;
+  metadataUpdatedAt?: string;
   latitude: number;
   longitude: number;
   altitudeMeters: number | null;

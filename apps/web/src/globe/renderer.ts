@@ -5,9 +5,15 @@ import {
   type GeoJSONSource,
   type FilterSpecification,
   type StyleSpecification,
+  type MapMouseEvent,
 } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import type { AircraftPosition } from "../aircraft";
+import {
+  aircraftSymbol,
+  aircraftSymbols,
+  aircraftIcon,
+} from "./aircraft-symbols";
 import { HOME, type View } from "./geography";
 import "maplibre-gl/dist/maplibre-gl.css";
 setWorkerUrl(workerUrl);
@@ -17,12 +23,16 @@ export interface GlobeController {
   zoom(change: number): void;
   rotate(latitude: number, longitude: number): void;
   setAircraft(aircraft: AircraftPosition[]): void;
+  selectAircraft(id: string | null): void;
   dispose(): void;
 }
 
 const AIRCRAFT_SOURCE = "skypulse-aircraft";
 
-function aircraftGeoJson(aircraft: AircraftPosition[]) {
+function aircraftGeoJson(
+  aircraft: AircraftPosition[],
+  selectedId: string | null = null,
+) {
   return {
     type: "FeatureCollection" as const,
     features: aircraft.map((position) => ({
@@ -37,6 +47,8 @@ function aircraftGeoJson(aircraft: AircraftPosition[]) {
         callsign: position.callsign,
         heading: position.headingDegrees,
         onGround: position.onGround,
+        selected: position.id === selectedId,
+        icon: `aircraft-${aircraftSymbol(position)}-${position.id === selectedId ? "selected" : position.onGround ? "ground" : "airborne"}`,
       },
     })),
   };
@@ -50,6 +62,7 @@ export async function createGlobe(
   onDetails: (message: string | null) => void,
   onPlaces: (names: string[]) => void,
   onLoading: (loading: boolean) => void,
+  onSelect: (id: string | null) => void,
 ): Promise<GlobeController> {
   const response = await fetch("/maps/style.json", {
     signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
@@ -293,30 +306,41 @@ export async function createGlobe(
       },
     },
     {
-      id: "aircraft-live",
+      id: "aircraft-selection",
       type: "circle",
       source: AIRCRAFT_SOURCE,
+      filter: ["==", ["get", "selected"], true],
       paint: {
-        "circle-color": [
-          "case",
-          ["boolean", ["get", "onGround"], false],
-          "#8da4a0",
-          "#66e4cc",
-        ],
-        "circle-radius": [
+        "circle-radius": 22,
+        "circle-color": "#ffd68a",
+        "circle-opacity": 0.12,
+        "circle-stroke-color": "#ffd68a",
+        "circle-stroke-width": 2,
+      },
+    },
+    {
+      id: "aircraft-live",
+      type: "symbol",
+      source: AIRCRAFT_SOURCE,
+      layout: {
+        "icon-image": ["get", "icon"],
+        "icon-size": [
           "interpolate",
           ["linear"],
           ["zoom"],
           2,
-          2,
+          0.45,
           7,
-          3,
+          0.65,
           12,
-          4.5,
+          0.85,
         ],
-        "circle-opacity": 0.95,
-        "circle-stroke-color": "#07131b",
-        "circle-stroke-width": 1,
+        "icon-rotate": ["coalesce", ["get", "heading"], 0],
+        "icon-rotation-alignment": "map",
+        "icon-pitch-alignment": "map",
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
+        "symbol-sort-key": ["case", ["get", "selected"], 1, 0],
       },
     },
   );
@@ -359,6 +383,7 @@ export async function createGlobe(
   });
   let disposed = false;
   let latestAircraft: AircraftPosition[] = [];
+  let selectedId: string | null = null;
   let lastReported = 0;
   let lastFocusUpdate = 0;
   let focusKey = "";
@@ -381,7 +406,7 @@ export async function createGlobe(
   }
   function updateAircraft() {
     const source = map.getSource(AIRCRAFT_SOURCE) as GeoJSONSource | undefined;
-    if (source) source.setData(aircraftGeoJson(latestAircraft));
+    if (source) source.setData(aircraftGeoJson(latestAircraft, selectedId));
   }
   function moved() {
     if (performance.now() - lastReported > 100) report();
@@ -419,6 +444,7 @@ export async function createGlobe(
       "=": () => zoom(1),
       "-": () => zoom(-1),
       Home: () => goTo(HOME),
+      Escape: () => selectAircraft(null),
     };
     if (actions[event.key]) {
       event.preventDefault();
@@ -429,6 +455,42 @@ export async function createGlobe(
     event.preventDefault();
     onError("The 3D connection was interrupted. Reload the globe to continue.");
   }
+  function selectAircraft(id: string | null) {
+    selectedId = latestAircraft.some((aircraft) => aircraft.id === id)
+      ? id
+      : null;
+    updateAircraft();
+    onSelect(selectedId);
+  }
+  function hitAircraft(event: MapMouseEvent): string | null {
+    if (!map.getLayer("aircraft-live")) return null;
+    const { x, y } = event.point;
+    const features = map.queryRenderedFeatures(
+      [
+        [x - 5, y - 5],
+        [x + 5, y + 5],
+      ],
+      { layers: ["aircraft-live"] },
+    );
+    return features[0]?.properties.id ?? null;
+  }
+  map.on("click", (event) => selectAircraft(hitAircraft(event)));
+  map.on("mousemove", (event) => {
+    canvas.style.cursor = hitAircraft(event) ? "pointer" : "grab";
+  });
+  map.on("load", () => {
+    for (const symbol of Object.keys(
+      aircraftSymbols,
+    ) as (keyof typeof aircraftSymbols)[]) {
+      for (const state of ["selected", "ground", "airborne"]) {
+        map.addImage(
+          `aircraft-${symbol}-${state}`,
+          aircraftIcon(symbol, state === "selected", state === "ground"),
+          { pixelRatio: 2 },
+        );
+      }
+    }
+  });
   map.on("error", () => {
     if (!disposed)
       onDetails(
@@ -485,9 +547,10 @@ export async function createGlobe(
     goTo,
     zoom,
     rotate,
+    selectAircraft,
     setAircraft(aircraft) {
       latestAircraft = aircraft;
-      if (!disposed) updateAircraft();
+      if (!disposed) selectAircraft(selectedId);
     },
     dispose() {
       disposed = true;

@@ -161,6 +161,7 @@
   color: #b9ceda;
 }
 .map-notice {
+  z-index: 4;
   position: absolute;
   top: 155px;
   left: 36px;
@@ -359,4 +360,217 @@
   .aircraft-feed-loading > span {
     animation: none;
   }
+}
+.aircraft-picker {
+  position: absolute;
+  left: 36px;
+  top: 158px;
+  width: 230px;
+  padding: 12px;
+  background: #0d1824ed;
+  border: 1px solid #304653;
+  border-radius: 10px;
+  font-size: 12px;
+}
+.aircraft-picker label {
+  display: block;
+  margin-bottom: 8px;
+  color: #a6c3cf;
+}
+.aircraft-picker select {
+  width: 100%;
+  padding: 9px;
+  color: #e5f2f3;
+  background: #102230;
+  border: 1px solid #45606d;
+  border-radius: 5px;
+}
+.aircraft-picker select:focus-visible,
+.aircraft-legend summary:focus-visible {
+  outline: 2px solid #ffd68a;
+  outline-offset: 3px;
+}
+.aircraft-legend {
+  margin-top: 12px;
+  color: #a6c3cf;
+}
+.aircraft-legend summary {
+  cursor: pointer;
+}
+.aircraft-legend ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.aircraft-legend li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 5px 0;
+}
+.aircraft-legend svg {
+  width: 27px;
+  height: 27px;
+  flex-shrink: 0;
+}
+.aircraft-legend p {
+  line-height: 1.5;
+  font-size: 11px;
+}
+.aircraft-legend path,
+.aircraft-type path {
+  fill: #66e4cc;
+  stroke: #66e4cc;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+.aircraft-inspector {
+  z-index: 3;
+  position: absolute;
+  top: 156px;
+  right: 94px;
+  width: 330px;
+  max-height: calc(100% - 280px);
+  overflow-y: auto;
+  padding: 20px;
+  background: #0d1824f5;
+  border: 1px solid #82704d;
+  border-radius: 12px;
+  box-shadow: 0 16px 50px #0005;
+}
+.aircraft-inspector header {
+  padding: 0;
+  border: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.aircraft-inspector h2 {
+  margin: 0;
+  font-size: 23px;
+  color: #ffd68a;
+  overflow-wrap: anywhere;
+}
+.aircraft-inspector header button {
+  padding: 6px 12px;
+  font-size: 22px;
+}
+.aircraft-type {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  font-size: 13px;
+}
+.aircraft-type svg {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+.aircraft-type path {
+  fill: #ffd68a;
+  stroke: #ffd68a;
+}
+.aircraft-type p {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #a6c3cf;
+}
+.aircraft-inspector dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 12px;
+  margin: 0;
+}
+.aircraft-inspector dt {
+  font-size: 10px;
+  color: #91a9b9;
+  margin-bottom: 6px;
+}
+.aircraft-inspector dd {
+  margin: 0;
+  font-size: 13px;
+  color: #e2edef;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.aircraft-inspector footer {
+  display: block;
+  letter-spacing: 0;
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #304653;
+  font-size: 10px;
+  color: #91a9b9;
+  line-height: 1.7;
+}
+.snapshot-warning {
+  color: #ffd68a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+@media (max-width: 750px) {
+  .aircraft-picker {
+    left: 20px;
+    top: 220px;
+    width: 205px;
+  }
+  .aircraft-inspector {
+    top: auto;
+    bottom: 22px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: 48%;
+    padding: 16px;
+  }
+  .aircraft-legend ul {
+    max-height: 130px;
+  }
+}
+.flight-route {
+  margin: 0 0 22px;
+  padding: 16px 0;
+  border-top: 1px solid #304653;
+  border-bottom: 1px solid #304653;
+}
+.flight-route h3 {
+  font-size: 13px;
+  margin: 0 0 16px;
+  color: #d9e9ee;
+}
+.flight-route p {
+  font-size: 12px;
+  color: #b4c9d2;
+  line-height: 1.5;
+  margin: 8px 0;
+}
+.route-airports {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.route-airports .hud-label {
+  margin-bottom: 8px;
+}
+.route-airports strong {
+  font-size: 24px;
+  color: #66e4cc;
+}
+.route-airports small {
+  font-size: 10px;
+  color: #91a9b9;
+  line-height: 1.5;
+}
+.flight-route .route-reference {
+  font-size: 10px;
+  color: #91a9b9;
+  margin-top: 16px;
+}
+.flight-route a,
+.aircraft-inspector footer a {
+  color: #a7d8dc;
 }

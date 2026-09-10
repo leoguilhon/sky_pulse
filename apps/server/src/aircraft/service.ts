@@ -1,3 +1,4 @@
+import type { FlightRoute } from "./flight-routes.js";
 import {
   AircraftProviderError,
   type AircraftPosition,
@@ -16,6 +17,7 @@ export interface AircraftSnapshot {
 
 export interface AircraftService {
   getAircraft(): Promise<AircraftSnapshot>;
+  getRoute?(id: string): Promise<FlightRoute | null>;
 }
 
 interface ServiceOptions {

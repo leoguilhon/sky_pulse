@@ -61,6 +61,21 @@ function setup(
 
 test("live aircraft are available only to authenticated users", async (context) => {
   const aircraft: AircraftService = {
+    async getRoute(id) {
+      return id === "e49001"
+        ? {
+            status: "no-callsign",
+            callsign: null,
+            source: "adsbdb",
+            fetchedAt: "2026-09-10T12:00:00Z",
+            origin: null,
+            destination: null,
+            via: [],
+            airline: null,
+            flightNumber: null,
+          }
+        : null;
+    },
     async getAircraft() {
       return {
         aircraft: [],
@@ -74,10 +89,41 @@ test("live aircraft are available only to authenticated users", async (context) 
   };
   const { app, login } = setup(context, false, aircraft);
   assert.equal((await app.inject("/api/aircraft")).statusCode, 401);
+  assert.equal(
+    (await app.inject("/api/aircraft/e49001/route")).statusCode,
+    401,
+  );
   const response = await login();
   const cookie = `${response.cookies[0]!.name}=${response.cookies[0]!.value}`;
   const live = await app.inject({ url: "/api/aircraft", headers: { cookie } });
   assert.equal(live.statusCode, 200);
+  assert.equal(
+    (
+      await app.inject({
+        url: "/api/aircraft/e49001/route",
+        headers: { cookie },
+      })
+    ).statusCode,
+    200,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        url: "/api/aircraft/xxxxxx/route",
+        headers: { cookie },
+      })
+    ).statusCode,
+    400,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        url: "/api/aircraft/e49002/route",
+        headers: { cookie },
+      })
+    ).statusCode,
+    404,
+  );
   assert.equal(live.json().provider, "Test provider");
   assert.equal(live.json().region.name, "São Paulo region");
 });

@@ -13,6 +13,32 @@ export async function registerAircraftRoutes(
   service: AircraftService,
   requireSession: SessionGuard,
 ) {
+  app.get<{ Params: { id: string } }>(
+    "/api/aircraft/:id/route",
+    {
+      preHandler: requireSession,
+      schema: {
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string", pattern: "^[a-f0-9]{6}$" } },
+        },
+      },
+    },
+    async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      if (!service.getRoute)
+        return reply
+          .code(503)
+          .send({ message: "Flight routes are temporarily unavailable." });
+      const route = await service.getRoute(request.params.id);
+      if (!route)
+        return reply
+          .code(404)
+          .send({ message: "Aircraft is no longer in the current snapshot." });
+      return route;
+    },
+  );
   app.get(
     "/api/aircraft",
     { preHandler: requireSession },

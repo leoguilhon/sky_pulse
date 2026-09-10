@@ -4,6 +4,8 @@ import { createAuthStore } from "./auth/store.js";
 import { OpenSkyProvider } from "./aircraft/opensky.js";
 import { createAircraftService } from "./aircraft/service.js";
 import { SAO_PAULO_REGION } from "./aircraft/types.js";
+import { enrichAircraft, syncAircraftCatalog } from "./aircraft/catalog.js";
+import { createFlightRouteLookup } from "./aircraft/flight-routes.js";
 const database = createDatabase();
 const origin = process.env.APP_ORIGIN ?? "http://localhost:8080";
 if (new URL(origin).origin !== origin)
@@ -26,7 +28,7 @@ if (
   aviationCacheSeconds > 3600
 )
   throw new Error("AVIATION_CACHE_TTL_SECONDS must be between 10 and 3600.");
-const aircraft = createAircraftService(
+const positions = createAircraftService(
   new OpenSkyProvider({
     baseUrl: process.env.AVIATION_API_BASE_URL,
     tokenUrl: process.env.OPENSKY_TOKEN_URL,
@@ -36,6 +38,26 @@ const aircraft = createAircraftService(
   SAO_PAULO_REGION.bounds,
   { cacheTtlMs: aviationCacheSeconds * 1000 },
 );
+const lookupRoute = createFlightRouteLookup();
+const aircraft = {
+  async getAircraft() {
+    const snapshot = await positions.getAircraft();
+    try {
+      return {
+        ...snapshot,
+        aircraft: await enrichAircraft(database, snapshot.aircraft),
+      };
+    } catch {
+      app.log.warn("Aircraft catalog unavailable; using reported categories.");
+      return snapshot;
+    }
+  },
+  async getRoute(id: string) {
+    const snapshot = await positions.getAircraft();
+    const position = snapshot.aircraft.find((item) => item.id === id);
+    return position ? lookupRoute(position.callsign) : null;
+  },
+};
 const app = createApp(
   async () => {
     await database.query(
@@ -54,7 +76,29 @@ const app = createApp(
 database.on("error", () =>
   app.log.error("An idle database connection failed."),
 );
-app.addHook("onClose", async () => database.end());
+let syncTask: Promise<unknown> | null = null;
+function refreshCatalog() {
+  if (syncTask) return;
+  syncTask = syncAircraftCatalog(database)
+    .then((result) => {
+      if (result) app.log.info(result, "Aircraft catalog updated.");
+    })
+    .catch(() =>
+      app.log.warn(
+        "Aircraft catalog refresh failed; retaining existing data and retrying later.",
+      ),
+    )
+    .finally(() => {
+      syncTask = null;
+    });
+}
+const catalogTimer = setInterval(refreshCatalog, 3600000);
+catalogTimer.unref();
+app.addHook("onClose", async () => {
+  clearInterval(catalogTimer);
+  await syncTask;
+  await database.end();
+});
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.once(signal, () => {
     app.close().catch(() => {
@@ -64,6 +108,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 try {
   await app.listen({ host: "0.0.0.0", port: 3000 });
+  refreshCatalog();
 } catch (error) {
   app.log.error(error);
   await app.close();
