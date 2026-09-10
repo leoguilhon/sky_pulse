@@ -2,7 +2,7 @@
 
 Explore the world's air traffic in real time.
 
-SkyPulse includes the Docker foundation, authentication, an interactive Earth, live aircraft, and Phase 5 aircraft inspection. Sign in to explore a 3D globe with real continent outlines, rotation, zoom, geographic navigation, and a live regional aircraft snapshot from OpenSky Network.
+SkyPulse includes the Docker foundation, authentication, an interactive Earth, live aircraft, aircraft inspection, and Phase 6 smooth movement. Sign in to explore a 3D globe with real continent outlines, rotation, zoom, geographic navigation, and a live regional aircraft snapshot from OpenSky Network.
 
 ## Start with Docker
 
@@ -93,9 +93,17 @@ The authenticated `GET /api/aircraft` endpoint loads a live snapshot for a 5 × 
 
 The browser never contacts OpenSky or receives provider credentials. The server supports anonymous OpenSky access by default and optional OAuth client credentials through `OPENSKY_CLIENT_ID` and `OPENSKY_CLIENT_SECRET`. OAuth access tokens are cached until shortly before expiry and refreshed once after an unauthorized response.
 
-Snapshots are shared in memory across users for five minutes by default. This keeps the 25-square-degree query at one OpenSky credit and prevents page loads from multiplying external requests. Concurrent cache misses share the same request. Provider `429` cooldowns are honored, and the last snapshot can be served as explicitly stale for up to 15 minutes during a rate limit or temporary outage. A missing or failed feed does not prevent geographic exploration. The browser refreshes its view every 30 seconds; OpenSky requests still use the shared five-minute cache. This also picks up newly imported aircraft metadata. Movement interpolation remains a future milestone.
+Snapshots are shared in memory across users for five minutes by default. This keeps the 25-square-degree query at one OpenSky credit and prevents page loads from multiplying external requests. Concurrent cache misses share the same request. Provider `429` cooldowns are honored, and the last snapshot can be served as explicitly stale for up to 15 minutes during a rate limit or temporary outage. A missing or failed feed does not prevent geographic exploration. The browser refreshes its view every 30 seconds; OpenSky requests still use the shared five-minute cache. This also picks up newly imported aircraft metadata. New position observations now transition smoothly on the client; cached repeats do not restart movement.
 
 OpenSky documents its live API for research and non-commercial use. Review the [OpenSky API documentation](https://openskynetwork.github.io/opensky-api/) and applicable terms before production or commercial deployment. Aircraft attribution is displayed in the workspace.
+
+### Smooth movement (Phase 6)
+
+The browser polls every 30 seconds after each request completes, with one request in flight and a 12-second timeout. Each newer aircraft observation transitions from its currently displayed location to the reported location over 30 seconds. Longitude and heading follow the shortest angular path, including the antimeridian and north crossing. Repeated cached observations can update metadata without restarting animation; older observations cannot rewind the rendered track. New aircraft appear at their reported location, and aircraft absent from the next snapshot are removed immediately.
+
+Animation updates the shared GeoJSON source at up to 30 frames per second without per-frame React updates. It pauses in hidden tabs, resumes at the elapsed transition time, and stops at the last reported position. Reduced-motion preferences display positions immediately. This is visual interpolation between observations, not predicted live telemetry: with the default five-minute provider cache, aircraft remain stationary after a transition until a newer observation arrives. The inspector always shows reported values and their original timestamp.
+
+Positions expire 10 minutes after their observation timestamp, checked every second and when returning to the tab, including during connection failures. Expiry removes the map symbol, picker entry and selected inspector; a cached response cannot renew the observation lifetime. This client display limit is independent of the server's 15-minute stale fallback. Invalid timestamps and timestamps more than one minute in the future are omitted. Animation frames and expiry timers are cleaned up when leaving the workspace.
 
 ### Aircraft inspection and shapes (Phase 5)
 
@@ -171,4 +179,4 @@ The `updated_at` user field is initialized by the schema; future user updates mu
 - `docs/architecture.md`: architectural decisions.
 - `PROJECT_CONTEXT.md`: product direction and phase roadmap.
 
-Phase 4 is implemented with a provider abstraction, normalized regional OpenSky data, shared rate-aware caching, graceful feed states, and batched aircraft rendering. Phase 5 adds aircraft selection, an inspection panel, heading-oriented category silhouettes, and a gold selection highlight. This is a local development environment; production requires TLS termination, deployment secret management, separate migration/runtime database roles, validation of provider licensing for the intended use, and appropriate login limiting for the deployment size.
+Phase 4 is implemented with a provider abstraction, normalized regional OpenSky data, shared rate-aware caching, graceful feed states, and batched aircraft rendering. Phase 5 adds aircraft selection, an inspection panel, heading-oriented category silhouettes, and a gold selection highlight. Phase 6 adds position/heading interpolation and observation-based expiry while preserving provider rate limits. This is a local development environment; production requires TLS termination, deployment secret management, separate migration/runtime database roles, validation of provider licensing for the intended use, and appropriate login limiting for the deployment size.

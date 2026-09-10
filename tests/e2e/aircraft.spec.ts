@@ -14,7 +14,7 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
     verticalRateMetersPerSecond: 0,
     onGround: false,
     originCountry: "Brazil",
-    lastUpdated: "2026-09-10T12:00:00.000Z",
+    lastUpdated: new Date().toISOString(),
   };
   const aircraft = [
     {
@@ -65,7 +65,7 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
     route.fulfill({
       json: {
         user: { id: "test-user", email: "pilot@example.test" },
-        expiresAt: "2099-01-01T00:00:00Z",
+        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
       },
     }),
   );
@@ -134,6 +134,7 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
       },
     }),
   );
+  await page.clock.install();
   await page.goto("/app");
   await expect(page.getByLabel("Inspect aircraft")).toBeVisible();
   await page.getByRole("button", { name: "São Paulo", exact: true }).click();
@@ -202,5 +203,15 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
   await canvas.focus();
   await page.keyboard.press("Escape");
   await expect(picker).toHaveValue("");
+  await picker.selectOption("abc001");
+  const refresh = page.waitForResponse("**/api/aircraft");
+  await page.clock.fastForward(31000);
+  await refresh;
+  await expect(picker).toHaveValue("abc001");
+  // Expiry must run independently of successful polling and clear inspection.
+  await page.route("**/api/aircraft", (route) => route.abort());
+  await page.clock.fastForward(10 * 60 * 1000);
+  await expect(picker).toHaveCount(0);
+  await expect(page.getByRole("complementary")).toHaveCount(0);
   expect(failures).toEqual([]);
 });

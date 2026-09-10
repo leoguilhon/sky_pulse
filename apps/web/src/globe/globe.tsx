@@ -5,6 +5,7 @@ import { createGlobe, type GlobeController } from "./renderer";
 import { HOME, type View } from "./geography";
 import "./globe.css";
 import { AircraftInspector, AircraftLegend } from "./aircraft-inspector";
+import { freshAircraft } from "./aircraft-motion";
 
 const regions = [
   { name: "Brazil", latitude: -15, longitude: -52, zoom: 4 },
@@ -37,6 +38,24 @@ export default function Globe({ expire }: { expire: () => void }) {
   const [attempt, setAttempt] = useState(0);
   const [feedAttempt, setFeedAttempt] = useState(0);
   const [feed, setFeed] = useState<FeedState>({ status: "loading" });
+  const [aircraftCount, setAircraftCount] = useState(0);
+  useEffect(() => {
+    const prune = () => {
+      const fresh = freshAircraft(aircraft.current, Date.now());
+      if (fresh.length === aircraft.current.length) return;
+      aircraft.current = fresh;
+      controller.current?.setAircraft(fresh);
+      setAircraftCount(fresh.length);
+      if (selection.current && !fresh.some((p) => p.id === selection.current))
+        selectAircraft(null);
+    };
+    const timer = setInterval(prune, 1000);
+    document.addEventListener("visibilitychange", prune);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", prune);
+    };
+  }, []);
   useEffect(() => {
     const abort = new AbortController();
     setState("loading");
@@ -92,8 +111,14 @@ export default function Globe({ expire }: { expire: () => void }) {
       })
         .then((data) => {
           if (abort.signal.aborted) return;
-          aircraft.current = data.aircraft;
-          controller.current?.setAircraft(data.aircraft);
+          aircraft.current = freshAircraft(data.aircraft, Date.now());
+          setAircraftCount(aircraft.current.length);
+          controller.current?.setAircraft(aircraft.current);
+          if (
+            selection.current &&
+            !aircraft.current.some((p) => p.id === selection.current)
+          )
+            selectAircraft(null);
           setFeed({
             status: data.stale
               ? "stale"
@@ -140,10 +165,10 @@ export default function Globe({ expire }: { expire: () => void }) {
   const feedLabel = () => {
     if (feed.status === "loading") return "Connecting live aircraft…";
     if (feed.status === "error") return "Live aircraft unavailable";
-    const count = feed.data.aircraft.length;
+    const count = aircraftCount;
     const aircraftLabel = `${count} aircraft`;
-    if (feed.status === "empty")
-      return `No aircraft reported · ${feed.data.region.name}`;
+    if (count === 0)
+      return `No recent aircraft positions · ${feed.data.region.name}`;
     if (feed.status === "stale") return `Stale snapshot · ${aircraftLabel}`;
     return `Live snapshot · ${aircraftLabel}`;
   };

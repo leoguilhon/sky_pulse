@@ -9,6 +9,7 @@ import {
 } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import type { AircraftPosition } from "../aircraft";
+import { AircraftMotion } from "./aircraft-motion";
 import {
   aircraftSymbol,
   aircraftSymbols,
@@ -383,10 +384,14 @@ export async function createGlobe(
   });
   let disposed = false;
   let latestAircraft: AircraftPosition[] = [];
+  const motion = new AircraftMotion();
+  let animationFrame = 0;
+  let lastAnimation = 0;
   let selectedId: string | null = null;
   let lastReported = 0;
   let lastFocusUpdate = 0;
   let focusKey = "";
+  let detailsDirty = true;
   function updateFocus() {
     if (disposed || !map.getLayer(labels[0]!.id)) return;
     const current = view();
@@ -405,10 +410,33 @@ export async function createGlobe(
     }
   }
   function updateAircraft() {
+    latestAircraft = motion.sample(Date.now(), reducedMotion.matches);
     const source = map.getSource(AIRCRAFT_SOURCE) as GeoJSONSource | undefined;
     if (source) source.setData(aircraftGeoJson(latestAircraft, selectedId));
   }
+  function animate(time: number) {
+    animationFrame = 0;
+    if (disposed || document.hidden) return;
+    if (time - lastAnimation >= 1000 / 30) {
+      updateAircraft();
+      lastAnimation = time;
+    }
+    if (!reducedMotion.matches && motion.isMoving(Date.now())) {
+      animationFrame = requestAnimationFrame(animate);
+    } else {
+      updateAircraft();
+    }
+  }
+  function resumeAnimation() {
+    cancelAnimationFrame(animationFrame);
+    if (!disposed && !document.hidden) {
+      updateAircraft();
+      if (!reducedMotion.matches && motion.isMoving(Date.now()))
+        animationFrame = requestAnimationFrame(animate);
+    }
+  }
   function moved() {
+    detailsDirty = true;
     if (performance.now() - lastReported > 100) report();
     if (performance.now() - lastFocusUpdate > 200) updateFocus();
   }
@@ -503,9 +531,15 @@ export async function createGlobe(
   map.on("moveend", updateFocus);
   map.on("resize", updateFocus);
   map.on("movestart", () => onLoading(true));
-  map.on("dataloading", () => onLoading(true));
+  map.on("dataloading", (event) => {
+    if (!("sourceId" in event) || event.sourceId !== AIRCRAFT_SOURCE) {
+      detailsDirty = true;
+      onLoading(true);
+    }
+  });
   map.on("idle", () => {
-    if (disposed) return;
+    if (disposed || !detailsDirty) return;
+    detailsDirty = false;
     const names = map
       .queryRenderedFeatures()
       .filter((feature) => feature.layer.id.startsWith("place_"))
@@ -537,6 +571,8 @@ export async function createGlobe(
   map.on("moveend", report);
   canvas.addEventListener("keydown", key);
   canvas.addEventListener("webglcontextlost", lost);
+  document.addEventListener("visibilitychange", resumeAnimation);
+  reducedMotion.addEventListener("change", resumeAnimation);
   const observer = new ResizeObserver(() => {
     if (!disposed) map.resize();
   });
@@ -549,11 +585,17 @@ export async function createGlobe(
     rotate,
     selectAircraft,
     setAircraft(aircraft) {
-      latestAircraft = aircraft;
-      if (!disposed) selectAircraft(selectedId);
+      if (disposed) return;
+      motion.update(aircraft, Date.now(), reducedMotion.matches);
+      latestAircraft = motion.sample(Date.now(), reducedMotion.matches);
+      selectAircraft(selectedId);
+      resumeAnimation();
     },
     dispose() {
       disposed = true;
+      cancelAnimationFrame(animationFrame);
+      document.removeEventListener("visibilitychange", resumeAnimation);
+      reducedMotion.removeEventListener("change", resumeAnimation);
       observer.disconnect();
       canvas.removeEventListener("keydown", key);
       canvas.removeEventListener("webglcontextlost", lost);

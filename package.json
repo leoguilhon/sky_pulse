@@ -15,7 +15,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run test --workspace @skypulse/server",
+    "test": "npm run test --workspace @skypulse/server && tsx --test tests/unit/*.test.ts",
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test"
   },
