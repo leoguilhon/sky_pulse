@@ -41,7 +41,7 @@ export function Workspace({ expire }: { expire: () => void }) {
             </p>
           }
         >
-          <Globe />
+          <Globe expire={expire} />
         </Suspense>
       </GlobeBoundary>
     );

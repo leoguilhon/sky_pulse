@@ -6,18 +6,27 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code = "UNKNOWN",
+    public retryAfterSeconds?: number,
   ) {
     super(message);
   }
 }
-export async function api<T>(path: string, body?: unknown): Promise<T> {
+export async function api<T>(
+  path: string,
+  body?: unknown,
+  options?: { signal?: AbortSignal; timeoutMs?: number },
+): Promise<T> {
   let response: Response;
   try {
+    const timeout = AbortSignal.timeout(options?.timeoutMs ?? 10000);
     response = await fetch(path, {
       method: body === undefined ? "GET" : "POST",
       credentials: "same-origin",
       cache: "no-store",
-      signal: AbortSignal.timeout(10000),
+      signal: options?.signal
+        ? AbortSignal.any([options.signal, timeout])
+        : timeout,
       headers:
         body === undefined
           ? {}
@@ -37,10 +46,16 @@ export async function api<T>(path: string, body?: unknown): Promise<T> {
         : "SkyPulse is temporarily unavailable. Please try again.";
     const data = (await response.json().catch(() => null)) as {
       message?: unknown;
+      code?: unknown;
+      retryAfterSeconds?: unknown;
     } | null;
     throw new ApiError(
       response.status,
       typeof data?.message === "string" ? data.message : fallback,
+      typeof data?.code === "string" ? data.code : "UNKNOWN",
+      typeof data?.retryAfterSeconds === "number"
+        ? data.retryAfterSeconds
+        : undefined,
     );
   }
   return response.status === 204

@@ -4,6 +4,7 @@ import { createApp } from "../src/app.js";
 import { tokenDigest } from "../src/auth/routes.js";
 import { hashPassword, verifyPassword } from "../src/auth/password.js";
 import type { AuthStore, Session } from "../src/auth/store.js";
+import type { AircraftService } from "../src/aircraft/service.js";
 
 const password = "test-only-password-42";
 const user = {
@@ -12,7 +13,11 @@ const user = {
   passwordHash: await hashPassword(password),
 };
 const headers = { origin: "http://localhost:8080", "x-skypulse-request": "1" };
-function setup(context: TestContext, secureCookie = false) {
+function setup(
+  context: TestContext,
+  secureCookie = false,
+  aircraft?: AircraftService,
+) {
   const sessions = new Map<string, Session>();
   const store: AuthStore = {
     async findUser(email) {
@@ -32,12 +37,17 @@ function setup(context: TestContext, secureCookie = false) {
       sessions.delete(hash);
     },
   };
-  const app = createApp(async () => {}, false, {
-    store,
-    origin: headers.origin,
-    secureCookie,
-    sessionSeconds: 3600,
-  });
+  const app = createApp(
+    async () => {},
+    false,
+    {
+      store,
+      origin: headers.origin,
+      secureCookie,
+      sessionSeconds: 3600,
+    },
+    aircraft,
+  );
   context.after(() => app.close());
   const login = (email = user.email, value = password, cookie?: string) =>
     app.inject({
@@ -48,6 +58,29 @@ function setup(context: TestContext, secureCookie = false) {
     });
   return { app, sessions, store, login };
 }
+
+test("live aircraft are available only to authenticated users", async (context) => {
+  const aircraft: AircraftService = {
+    async getAircraft() {
+      return {
+        aircraft: [],
+        observedAt: "2026-09-10T12:00:00.000Z",
+        fetchedAt: "2026-09-10T12:00:01.000Z",
+        provider: "Test provider",
+        cached: false,
+        stale: false,
+      };
+    },
+  };
+  const { app, login } = setup(context, false, aircraft);
+  assert.equal((await app.inject("/api/aircraft")).statusCode, 401);
+  const response = await login();
+  const cookie = `${response.cookies[0]!.name}=${response.cookies[0]!.value}`;
+  const live = await app.inject({ url: "/api/aircraft", headers: { cookie } });
+  assert.equal(live.statusCode, 200);
+  assert.equal(live.json().provider, "Test provider");
+  assert.equal(live.json().region.name, "São Paulo region");
+});
 
 test("password hashes use random salts and verify without storing plaintext", async () => {
   const other = await hashPassword(password);

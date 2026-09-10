@@ -23,6 +23,11 @@ services:
       DB_HOST: database
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:${WEB_PORT:-8080}}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
+      AVIATION_CACHE_TTL_SECONDS: ${AVIATION_CACHE_TTL_SECONDS:-300}
+      AVIATION_API_BASE_URL: ${AVIATION_API_BASE_URL:-https://opensky-network.org/api}
+      OPENSKY_TOKEN_URL: ${OPENSKY_TOKEN_URL:-https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token}
+      OPENSKY_CLIENT_ID: ${OPENSKY_CLIENT_ID:-}
+      OPENSKY_CLIENT_SECRET: ${OPENSKY_CLIENT_SECRET:-}
     depends_on:
       database:
         condition: service_healthy

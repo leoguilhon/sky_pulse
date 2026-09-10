@@ -229,6 +229,52 @@ test("globe supports region navigation, zoom, dragging, keyboard, and resize", a
   expect(failures).toEqual([]);
 });
 
+test("normalized live aircraft feed is displayed without exposing provider requests", async ({
+  page,
+}) => {
+  await page.route("**/api/aircraft", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        aircraft: [
+          {
+            id: "e490a1",
+            callsign: null,
+            latitude: -23.55,
+            longitude: -46.63,
+            altitudeMeters: null,
+            speedMetersPerSecond: null,
+            headingDegrees: null,
+            verticalRateMetersPerSecond: null,
+            onGround: false,
+            originCountry: null,
+            lastUpdated: "2026-09-10T12:00:00.000Z",
+          },
+        ],
+        observedAt: "2026-09-10T12:00:00.000Z",
+        fetchedAt: "2026-09-10T12:00:01.000Z",
+        provider: "Test provider",
+        cached: false,
+        stale: false,
+        region: {
+          name: "São Paulo region",
+          bounds: {
+            minimumLatitude: -25.5,
+            maximumLatitude: -20.5,
+            minimumLongitude: -49.5,
+            maximumLongitude: -44.5,
+          },
+        },
+      }),
+    }),
+  );
+  await signIn(page);
+  await expect(page.locator(".aircraft-feed")).toHaveText(
+    /LIVE SNAPSHOT · 1 AIRCRAFT/i,
+  );
+  await expect(page.getByText("Aircraft data · Test provider")).toBeVisible();
+});
+
 test("missing map can be retried and WebGL context loss stays recoverable", async ({
   page,
 }) => {

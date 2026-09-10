@@ -173,13 +173,83 @@
 }
 .map-loading {
   position: absolute;
-  top: 82px;
+  top: 112px;
   right: 36px;
   font-size: 10px;
   color: #a6c3cf;
   background: #0d1824d9;
   padding: 5px 8px;
   border-radius: 4px;
+}
+.aircraft-feed {
+  position: absolute;
+  top: 82px;
+  right: 36px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: #0d1824d9;
+  color: #a6c3cf;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.aircraft-feed > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #66e4cc;
+  box-shadow: 0 0 8px #66e4cc88;
+}
+.aircraft-feed-loading > span {
+  animation: feed-pulse 1.2s ease-in-out infinite;
+}
+.aircraft-feed-empty > span,
+.aircraft-feed-stale > span {
+  background: #d5ad6d;
+  box-shadow: none;
+}
+.aircraft-feed-error > span {
+  background: #d87c72;
+  box-shadow: none;
+}
+.aircraft-notice {
+  position: absolute;
+  top: 145px;
+  right: 36px;
+  max-width: 340px;
+  padding: 12px;
+  border: 1px solid #684b46;
+  border-radius: 8px;
+  background: #1a2029f2;
+  font-size: 12px;
+}
+.aircraft-notice p {
+  margin: 0;
+  line-height: 1.5;
+  color: #e3aaa3;
+}
+.aircraft-notice button {
+  margin-top: 10px;
+  padding: 8px 10px;
+}
+.aircraft-credit {
+  position: absolute;
+  right: 36px;
+  bottom: 24px;
+  color: #78909f;
+  font-size: 10px;
+  text-decoration: none;
+}
+.aircraft-credit:hover {
+  color: #a6c3cf;
+}
+@keyframes feed-pulse {
+  50% {
+    opacity: 0.35;
+  }
 }
 .map-notice p {
   line-height: 1.5;
@@ -246,9 +316,20 @@
     right: 16px;
   }
   .map-loading {
+    top: 185px;
+    left: 20px;
+    right: auto;
+  }
+  .aircraft-feed {
     top: 155px;
     left: 20px;
     right: auto;
+  }
+  .aircraft-notice {
+    top: 215px;
+    left: 20px;
+    right: auto;
+    max-width: calc(100% - 40px);
   }
   .globe-bottom {
     left: 20px;
@@ -268,5 +349,14 @@
     bottom: 15px;
     left: 20px;
     right: auto;
+  }
+  .aircraft-credit {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aircraft-feed-loading > span {
+    animation: none;
   }
 }

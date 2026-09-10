@@ -2,10 +2,12 @@ import {
   Map,
   AttributionControl,
   setWorkerUrl,
+  type GeoJSONSource,
   type FilterSpecification,
   type StyleSpecification,
 } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
+import type { AircraftPosition } from "../aircraft";
 import { HOME, type View } from "./geography";
 import "maplibre-gl/dist/maplibre-gl.css";
 setWorkerUrl(workerUrl);
@@ -14,7 +16,30 @@ export interface GlobeController {
   goTo(view: View): void;
   zoom(change: number): void;
   rotate(latitude: number, longitude: number): void;
+  setAircraft(aircraft: AircraftPosition[]): void;
   dispose(): void;
+}
+
+const AIRCRAFT_SOURCE = "skypulse-aircraft";
+
+function aircraftGeoJson(aircraft: AircraftPosition[]) {
+  return {
+    type: "FeatureCollection" as const,
+    features: aircraft.map((position) => ({
+      type: "Feature" as const,
+      id: position.id,
+      geometry: {
+        type: "Point" as const,
+        coordinates: [position.longitude, position.latitude],
+      },
+      properties: {
+        id: position.id,
+        callsign: position.callsign,
+        heading: position.headingDegrees,
+        onGround: position.onGround,
+      },
+    })),
+  };
 }
 
 export async function createGlobe(
@@ -246,6 +271,55 @@ export async function createGlobe(
       layer.paint = { ...layer.paint, "icon-opacity": 0.3 };
     }
   }
+  style.sources[AIRCRAFT_SOURCE] = {
+    type: "geojson",
+    data: aircraftGeoJson([]),
+  };
+  style.layers.push(
+    {
+      id: "aircraft-glow",
+      type: "circle",
+      source: AIRCRAFT_SOURCE,
+      paint: {
+        "circle-color": [
+          "case",
+          ["boolean", ["get", "onGround"], false],
+          "#8da4a0",
+          "#66e4cc",
+        ],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 2, 5, 12, 9],
+        "circle-blur": 1,
+        "circle-opacity": 0.3,
+      },
+    },
+    {
+      id: "aircraft-live",
+      type: "circle",
+      source: AIRCRAFT_SOURCE,
+      paint: {
+        "circle-color": [
+          "case",
+          ["boolean", ["get", "onGround"], false],
+          "#8da4a0",
+          "#66e4cc",
+        ],
+        "circle-radius": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          2,
+          2,
+          7,
+          3,
+          12,
+          4.5,
+        ],
+        "circle-opacity": 0.95,
+        "circle-stroke-color": "#07131b",
+        "circle-stroke-width": 1,
+      },
+    },
+  );
   let map: Map;
   try {
     map = new Map({
@@ -275,7 +349,7 @@ export async function createGlobe(
   const canvas = map.getCanvas();
   canvas.tabIndex = 0;
   canvas.setAttribute("role", "img");
-  canvas.setAttribute("aria-label", "Interactive 3D Earth");
+  canvas.setAttribute("aria-label", "Interactive 3D Earth with live aircraft");
   canvas.setAttribute("aria-describedby", "globe-instructions");
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const view = (): View => ({
@@ -284,6 +358,7 @@ export async function createGlobe(
     zoom: map.getZoom(),
   });
   let disposed = false;
+  let latestAircraft: AircraftPosition[] = [];
   let lastReported = 0;
   let lastFocusUpdate = 0;
   let focusKey = "";
@@ -303,6 +378,10 @@ export async function createGlobe(
       onView(view());
       lastReported = performance.now();
     }
+  }
+  function updateAircraft() {
+    const source = map.getSource(AIRCRAFT_SOURCE) as GeoJSONSource | undefined;
+    if (source) source.setData(aircraftGeoJson(latestAircraft));
   }
   function moved() {
     if (performance.now() - lastReported > 100) report();
@@ -358,6 +437,7 @@ export async function createGlobe(
   });
   map.on("load", report);
   map.on("load", updateFocus);
+  map.on("load", updateAircraft);
   map.on("moveend", updateFocus);
   map.on("resize", updateFocus);
   map.on("movestart", () => onLoading(true));
@@ -405,6 +485,10 @@ export async function createGlobe(
     goTo,
     zoom,
     rotate,
+    setAircraft(aircraft) {
+      latestAircraft = aircraft;
+      if (!disposed) updateAircraft();
+    },
     dispose() {
       disposed = true;
       observer.disconnect();

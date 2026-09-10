@@ -2,7 +2,7 @@
 
 Explore the world's air traffic in real time.
 
-SkyPulse includes the Docker foundation, authentication, and Phase 3 interactive Earth. Sign in to explore a 3D globe with real continent outlines, rotation, zoom, and geographic navigation. Live aircraft remain a future phase; the explorer labels its current exploration-only mode.
+SkyPulse includes the Docker foundation, authentication, an interactive Earth, and Phase 4 live aircraft. Sign in to explore a 3D globe with real continent outlines, rotation, zoom, geographic navigation, and a live regional aircraft snapshot from OpenSky Network.
 
 ## Start with Docker
 
@@ -42,13 +42,16 @@ Browser -> web (Nginx, localhost:8080)
 
 Only the web port is published, bound to localhost. Database credentials are passed at runtime and excluded from image build contexts. Both application containers run as non-root users.
 
-| Variable              | Default                       | Purpose                                                                                                             |
-| --------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `POSTGRES_PASSWORD`   | Required                      | Database password used by database and server.                                                                      |
-| `WEB_PORT`            | `8080`                        | Web port bound to `127.0.0.1`.                                                                                      |
-| `DB_HOST`             | `database`                    | Backend database hostname, set by Compose.                                                                          |
-| `APP_ORIGIN`          | `http://localhost:<WEB_PORT>` | Exact browser origin, without a trailing slash. Checked on all authentication writes. HTTPS enables Secure cookies. |
-| `SESSION_TTL_SECONDS` | `28800`                       | Fixed session lifetime (8 hours), between 60 and 86400 seconds. Applies to new sessions.                            |
+| Variable                                      | Default                       | Purpose                                                                                                             |
+| --------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `POSTGRES_PASSWORD`                           | Required                      | Database password used by database and server.                                                                      |
+| `WEB_PORT`                                    | `8080`                        | Web port bound to `127.0.0.1`.                                                                                      |
+| `DB_HOST`                                     | `database`                    | Backend database hostname, set by Compose.                                                                          |
+| `APP_ORIGIN`                                  | `http://localhost:<WEB_PORT>` | Exact browser origin, without a trailing slash. Checked on all authentication writes. HTTPS enables Secure cookies. |
+| `SESSION_TTL_SECONDS`                         | `28800`                       | Fixed session lifetime (8 hours), between 60 and 86400 seconds. Applies to new sessions.                            |
+| `AVIATION_CACHE_TTL_SECONDS`                  | `300`                         | Shared live snapshot lifetime (10-3600 seconds). The default protects the anonymous OpenSky credit allowance.       |
+| `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` | Empty                         | Optional OpenSky OAuth client credentials. Both must be configured together.                                        |
+| `AVIATION_API_BASE_URL` / `OPENSKY_TOKEN_URL` | OpenSky endpoints             | Optional provider endpoint overrides for development and compatible test services.                                  |
 
 The database and database user are both named `skypulse`. For optional host Vite development, use `APP_ORIGIN=http://localhost:5173` in the backend environment. The default Compose workflow uses compiled images; host API development additionally requires a reachable migrated database and its credentials.
 
@@ -80,9 +83,19 @@ After login, the globe fills the protected workspace, initially centered on Braz
 
 The readout shows map-center coordinates and cartographic zoom (0.5-18). Zooming in progressively reveals country and state boundaries, state names, cities, neighborhoods, and roads where available in the map data. MapLibre transitions from a globe overview to a local map as you approach. Labels are placed to reduce overlap. Region transitions respect reduced-motion preferences, and the viewport resizes with the window.
 
-The map uses MapLibre GL JS with the OpenFreeMap Dark vector style, customized for readable labels and state boundaries. OpenFreeMap serves OpenStreetMap/OpenMapTiles tiles, fonts, and symbols directly to the browser. Internet access is required; no API key is needed. Only visible tiles and required detail levels are requested, with a bounded renderer cache. Place names prefer English where available and otherwise retain source geographic names. Attribution stays visible, and style licenses are included in `apps/web/public/maps/`.
+The map uses MapLibre GL JS with the OpenFreeMap Dark vector style, customized as a subdued basemap so aircraft retain the visual priority. OpenFreeMap serves OpenStreetMap/OpenMapTiles tiles, fonts, and symbols directly to the browser. Internet access is required; no map API key is needed. Only visible tiles and required detail levels are requested, with a bounded renderer cache. Place names prefer English where available and otherwise retain source geographic names. Attribution stays visible, and style licenses are included in `apps/web/public/maps/`.
 
 WebGL is required. Unsupported graphics, context loss, and loading failures display recovery instructions while keeping logout available. Partial map outages display a reload notice rather than presenting incomplete data as complete. The map and its resources are removed when leaving the workspace. MapLibre loads only after authorization. Map requests never include SkyPulse credentials. To change providers, update the style source/glyph/sprite URLs and the map host allowlist in Nginx; see `apps/web/public/maps/README.md`.
+
+## Live aircraft
+
+The authenticated `GET /api/aircraft` endpoint loads a live snapshot for a 5 × 5 degree São Paulo region (`-25.5…-20.5` latitude, `-49.5…-44.5` longitude). Aircraft with valid coordinates are normalized into SkyPulse's provider-independent model and rendered as one batched GeoJSON layer. Missing callsigns, altitude, speed, heading, and other optional values are accepted; rows without valid coordinates are omitted.
+
+The browser never contacts OpenSky or receives provider credentials. The server supports anonymous OpenSky access by default and optional OAuth client credentials through `OPENSKY_CLIENT_ID` and `OPENSKY_CLIENT_SECRET`. OAuth access tokens are cached until shortly before expiry and refreshed once after an unauthorized response.
+
+Snapshots are shared in memory across users for five minutes by default. This keeps the 25-square-degree query at one OpenSky credit and prevents page loads from multiplying external requests. Concurrent cache misses share the same request. Provider `429` cooldowns are honored, and the last snapshot can be served as explicitly stale for up to 15 minutes during a rate limit or temporary outage. A missing or failed feed does not prevent geographic exploration. Phase 4 intentionally loads a snapshot on workspace entry or manual retry; periodic updates and movement interpolation belong to Phase 6.
+
+OpenSky documents its live API for research and non-commercial use. Review the [OpenSky API documentation](https://openskynetwork.github.io/opensky-api/) and applicable terms before production or commercial deployment. Aircraft attribution is displayed in the workspace.
 
 ## Development and quality
 
@@ -128,4 +141,4 @@ The `updated_at` user field is initialized by the schema; future user updates mu
 - `docs/architecture.md`: architectural decisions.
 - `PROJECT_CONTEXT.md`: product direction and phase roadmap.
 
-Phase 3 is implemented. Phase 4 will connect a real aviation provider and display aircraft. No aviation API calls are made yet. This is a local development environment; production requires TLS termination, deployment secret management, separate migration/runtime database roles, and appropriate login limiting for the deployment size.
+Phase 4 is implemented with a provider abstraction, normalized regional OpenSky data, shared rate-aware caching, graceful feed states, and batched aircraft rendering. Phase 5 will add aircraft selection and inspection. This is a local development environment; production requires TLS termination, deployment secret management, separate migration/runtime database roles, validation of provider licensing for the intended use, and appropriate login limiting for the deployment size.
