@@ -71,7 +71,14 @@ export function normalizeOpenSkyState(
   }
   const timePosition = numberAt(value, 3);
   const lastContact = numberAt(value, 4);
-  const updatedSeconds = timePosition ?? lastContact ?? observedAtSeconds;
+  const positionUpdatedSeconds =
+    timePosition ?? lastContact ?? observedAtSeconds;
+  const updatedSeconds =
+    timePosition === null
+      ? (lastContact ?? observedAtSeconds)
+      : lastContact === null
+        ? timePosition
+        : Math.max(timePosition, lastContact);
   const categoryCode = numberAt(value, 17);
   // Surface vehicles and obstacles must not appear as aircraft.
   if (categoryCode !== null && categoryCode >= 16 && categoryCode <= 20)
@@ -88,6 +95,7 @@ export function normalizeOpenSkyState(
     verticalRateMetersPerSecond: numberAt(value, 11),
     onGround: value[8] === true,
     originCountry: textAt(value, 2),
+    positionUpdatedAt: new Date(positionUpdatedSeconds * 1000).toISOString(),
     lastUpdated: new Date(updatedSeconds * 1000).toISOString(),
   };
 }

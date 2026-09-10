@@ -16,12 +16,13 @@ function position(overrides: Partial<AircraftPosition> = {}): AircraftPosition {
     category: null,
     latitude: 0,
     longitude: 179,
-    altitudeMeters: null,
-    speedMetersPerSecond: null,
+    altitudeMeters: 1000,
+    speedMetersPerSecond: 100,
     headingDegrees: 350,
-    verticalRateMetersPerSecond: null,
+    verticalRateMetersPerSecond: 5,
     onGround: false,
     originCountry: null,
+    positionUpdatedAt: new Date(now).toISOString(),
     lastUpdated: new Date(now).toISOString(),
     ...overrides,
   };
@@ -30,7 +31,11 @@ const updated = (overrides: Partial<AircraftPosition> = {}) =>
   position({
     latitude: 10,
     longitude: -179,
+    altitudeMeters: 500,
+    speedMetersPerSecond: 80,
     headingDegrees: 10,
+    verticalRateMetersPerSecond: -5,
+    positionUpdatedAt: new Date(now + 1000).toISOString(),
     lastUpdated: new Date(now + 1000).toISOString(),
     ...overrides,
   });
@@ -42,7 +47,10 @@ test("positions and headings take the shortest path and stop at the observation"
   const middle = motion.sample(now + 1000 + TRANSITION_MS / 2)[0]!;
   assert.equal(middle.latitude, 5);
   assert.equal(middle.longitude, -180);
+  assert.equal(middle.altitudeMeters, 750);
+  assert.equal(middle.speedMetersPerSecond, 90);
   assert.equal(middle.headingDegrees, 0);
+  assert.equal(middle.verticalRateMetersPerSecond, 0);
   assert.equal(middle.lastUpdated, updated().lastUpdated);
   assert.deepEqual(motion.sample(now + 61000), [updated()]);
   assert.equal(motion.isMoving(now + 61000), false);
@@ -68,6 +76,7 @@ test("an interrupted transition starts at its displayed position", () => {
     [
       updated({
         latitude: 20,
+        positionUpdatedAt: new Date(now + 16000).toISOString(),
         lastUpdated: new Date(now + 16000).toISOString(),
       }),
     ],
@@ -75,6 +84,30 @@ test("an interrupted transition starts at its displayed position", () => {
   );
   assert.equal(motion.sample(now + 16000)[0]!.latitude, before.latitude);
   assert.equal(motion.sample(now + 31000)[0]!.latitude, 12.5);
+});
+
+test("new telemetry updates without pretending an unchanged position is new", () => {
+  const motion = new AircraftMotion();
+  motion.update([position()], now);
+  motion.update(
+    [
+      position({
+        latitude: 20,
+        altitudeMeters: 800,
+        speedMetersPerSecond: 70,
+        headingDegrees: 20,
+        verticalRateMetersPerSecond: -3,
+        lastUpdated: new Date(now + 1000).toISOString(),
+      }),
+    ],
+    now + 1000,
+  );
+  const middle = motion.sample(now + 1000 + TRANSITION_MS / 2)[0]!;
+  assert.equal(middle.latitude, 0);
+  assert.equal(middle.altitudeMeters, 900);
+  assert.equal(middle.speedMetersPerSecond, 85);
+  assert.equal(middle.headingDegrees, 5);
+  assert.equal(middle.verticalRateMetersPerSecond, 1);
 });
 
 test("expiry is based on observation time, even with repeated cached responses", () => {

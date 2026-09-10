@@ -24,6 +24,8 @@ export default function Globe({ expire }: { expire: () => void }) {
   const controller = useRef<GlobeController | null>(null);
   const aircraft = useRef<AircraftPosition[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedAircraft, setSelectedAircraft] =
+    useState<AircraftPosition | null>(null);
   const selection = useRef<string | null>(null);
   const selectAircraft = (id: string | null) => {
     selection.current = id;
@@ -75,6 +77,7 @@ export default function Globe({ expire }: { expire: () => void }) {
       setPlaces,
       setDetailsLoading,
       selectAircraft,
+      setSelectedAircraft,
     )
       .then((instance) => {
         if (abort.signal.aborted) {
@@ -152,9 +155,6 @@ export default function Globe({ expire }: { expire: () => void }) {
       clearTimeout(timer);
     };
   }, [expire, feedAttempt]);
-  const selectedAircraft = aircraft.current.find(
-    (position) => position.id === selectedId,
-  );
   const closeInspection = () => {
     controller.current?.selectAircraft(null);
     selectAircraft(null);

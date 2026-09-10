@@ -5,6 +5,7 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
 }, testInfo) => {
   const failures: string[] = [];
   page.on("pageerror", (error) => failures.push(error.message));
+  const initialTimestamp = new Date().toISOString();
   const base = {
     latitude: -23.5505,
     longitude: -46.6333,
@@ -14,7 +15,8 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
     verticalRateMetersPerSecond: 0,
     onGround: false,
     originCountry: "Brazil",
-    lastUpdated: new Date().toISOString(),
+    positionUpdatedAt: initialTimestamp,
+    lastUpdated: initialTimestamp,
   };
   const aircraft = [
     {
@@ -72,19 +74,40 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
   await page.route("**/api/workspace", (route) =>
     route.fulfill({ json: { message: "Ready" } }),
   );
-  await page.route("**/api/aircraft", (route) =>
-    route.fulfill({
+  let updateTelemetry = false;
+  await page.route("**/api/aircraft", (route) => {
+    const timestamp = new Date(
+      Date.parse(initialTimestamp) + 30000,
+    ).toISOString();
+    const responseAircraft = updateTelemetry
+      ? aircraft.map((position) =>
+          position.id === "abc001"
+            ? {
+                ...position,
+                longitude: -46.6233,
+                altitudeMeters: 9000,
+                speedMetersPerSecond: 150,
+                headingDegrees: 100,
+                verticalRateMetersPerSecond: -10,
+                positionUpdatedAt: timestamp,
+                lastUpdated: timestamp,
+              }
+            : position,
+        )
+      : aircraft;
+    const responseTimestamp = updateTelemetry ? timestamp : initialTimestamp;
+    return route.fulfill({
       json: {
-        aircraft,
-        observedAt: base.lastUpdated,
-        fetchedAt: base.lastUpdated,
+        aircraft: responseAircraft,
+        observedAt: responseTimestamp,
+        fetchedAt: responseTimestamp,
         provider: "Test provider",
         cached: true,
         stale: true,
         region: { name: "Test region", bounds: {} },
       },
-    }),
-  );
+    });
+  });
   // Use a local empty basemap so interaction tests do not depend on tile services.
   await page.route("**/maps/style.json", (route) =>
     route.fulfill({
@@ -204,10 +227,15 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
   await page.keyboard.press("Escape");
   await expect(picker).toHaveValue("");
   await picker.selectOption("abc001");
+  updateTelemetry = true;
   const refresh = page.waitForResponse("**/api/aircraft");
   await page.clock.fastForward(31000);
   await refresh;
   await expect(picker).toHaveValue("abc001");
+  await page.clock.fastForward(30000);
+  await expect(page.getByRole("complementary")).toContainText("29,528 ft");
+  await expect(page.getByRole("complementary")).toContainText("292 kt");
+  await expect(page.getByRole("complementary")).toContainText("-1,969 ft/min");
   // Expiry must run independently of successful polling and clear inspection.
   await page.route("**/api/aircraft", (route) => route.abort());
   await page.clock.fastForward(10 * 60 * 1000);

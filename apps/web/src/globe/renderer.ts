@@ -64,6 +64,7 @@ export async function createGlobe(
   onPlaces: (names: string[]) => void,
   onLoading: (loading: boolean) => void,
   onSelect: (id: string | null) => void,
+  onAircraftSample: (aircraft: AircraftPosition | null) => void,
 ): Promise<GlobeController> {
   const response = await fetch("/maps/style.json", {
     signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
@@ -388,6 +389,7 @@ export async function createGlobe(
   let animationFrame = 0;
   let lastAnimation = 0;
   let selectedId: string | null = null;
+  let lastAircraftSampleReport = -Infinity;
   let lastReported = 0;
   let lastFocusUpdate = 0;
   let focusKey = "";
@@ -409,10 +411,20 @@ export async function createGlobe(
       lastReported = performance.now();
     }
   }
-  function updateAircraft() {
+  function updateAircraft(reportSelected = false) {
     latestAircraft = motion.sample(Date.now(), reducedMotion.matches);
     const source = map.getSource(AIRCRAFT_SOURCE) as GeoJSONSource | undefined;
     if (source) source.setData(aircraftGeoJson(latestAircraft, selectedId));
+    const reportTime = performance.now();
+    if (
+      reportSelected ||
+      (selectedId !== null && reportTime - lastAircraftSampleReport >= 250)
+    ) {
+      lastAircraftSampleReport = reportTime;
+      onAircraftSample(
+        latestAircraft.find((aircraft) => aircraft.id === selectedId) ?? null,
+      );
+    }
   }
   function animate(time: number) {
     animationFrame = 0;
@@ -487,7 +499,7 @@ export async function createGlobe(
     selectedId = latestAircraft.some((aircraft) => aircraft.id === id)
       ? id
       : null;
-    updateAircraft();
+    updateAircraft(true);
     onSelect(selectedId);
   }
   function hitAircraft(event: MapMouseEvent): string | null {
@@ -527,7 +539,7 @@ export async function createGlobe(
   });
   map.on("load", report);
   map.on("load", updateFocus);
-  map.on("load", updateAircraft);
+  map.on("load", () => updateAircraft());
   map.on("moveend", updateFocus);
   map.on("resize", updateFocus);
   map.on("movestart", () => onLoading(true));

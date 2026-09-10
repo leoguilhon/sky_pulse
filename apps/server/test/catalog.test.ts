@@ -51,6 +51,7 @@ test("catalog engine descriptors classify types beyond the original hardcoded li
     verticalRateMetersPerSecond: null,
     onGround: false,
     originCountry: null,
+    positionUpdatedAt: "2026-09-10T12:00:00Z",
     lastUpdated: "2026-09-10T12:00:00Z",
   };
   for (const [typeCode, typeDescription, wakeCategory, expected] of [

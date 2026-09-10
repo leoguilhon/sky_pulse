@@ -103,13 +103,25 @@ export function AircraftInspector({
         ))}
       </dl>
       <footer>
-        Position updated{" "}
+        Telemetry updated{" "}
         <time dateTime={aircraft.lastUpdated}>
           {new Date(aircraft.lastUpdated).toLocaleString("en-US", {
             timeZone: "UTC",
           })}{" "}
           UTC
         </time>
+        {aircraft.positionUpdatedAt !== aircraft.lastUpdated && (
+          <>
+            <br />
+            Position updated{" "}
+            <time dateTime={aircraft.positionUpdatedAt}>
+              {new Date(aircraft.positionUpdatedAt).toLocaleString("en-US", {
+                timeZone: "UTC",
+              })}{" "}
+              UTC
+            </time>
+          </>
+        )}
         <br />
         {provider}
         {aircraft.metadataSource && (

@@ -35,6 +35,7 @@ export interface AircraftPosition {
   verticalRateMetersPerSecond: number | null;
   onGround: boolean;
   originCountry: string | null;
+  positionUpdatedAt: string;
   lastUpdated: string;
 }
 

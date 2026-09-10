@@ -41,7 +41,8 @@ test("OpenSky state vectors normalize without leaking provider arrays", () => {
     verticalRateMetersPerSecond: -0.3,
     onGround: false,
     originCountry: "Brazil",
-    lastUpdated: "2023-11-14T22:13:21.000Z",
+    positionUpdatedAt: "2023-11-14T22:13:21.000Z",
+    lastUpdated: "2023-11-14T22:13:22.000Z",
   });
   assert.equal(normalizeOpenSkyState(null, 1_700_000_000), null);
   assert.equal(

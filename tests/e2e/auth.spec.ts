@@ -232,6 +232,7 @@ test("globe supports region navigation, zoom, dragging, keyboard, and resize", a
 test("normalized live aircraft feed is displayed without exposing provider requests", async ({
   page,
 }) => {
+  const observedAt = new Date().toISOString();
   await page.route("**/api/aircraft", (route) =>
     route.fulfill({
       contentType: "application/json",
@@ -248,11 +249,12 @@ test("normalized live aircraft feed is displayed without exposing provider reque
             verticalRateMetersPerSecond: null,
             onGround: false,
             originCountry: null,
-            lastUpdated: "2026-09-10T12:00:00.000Z",
+            positionUpdatedAt: observedAt,
+            lastUpdated: observedAt,
           },
         ],
-        observedAt: "2026-09-10T12:00:00.000Z",
-        fetchedAt: "2026-09-10T12:00:01.000Z",
+        observedAt,
+        fetchedAt: observedAt,
         provider: "Test provider",
         cached: false,
         stale: false,
