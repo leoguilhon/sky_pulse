@@ -15,6 +15,26 @@ export const SAO_PAULO_REGION = {
   },
 } as const;
 
+export const WORLD_REGION = {
+  name: "Worldwide",
+  bounds: {
+    minimumLatitude: -90,
+    maximumLatitude: 90,
+    minimumLongitude: -180,
+    maximumLongitude: 180,
+  },
+} as const;
+
+export type AviationRegion = typeof SAO_PAULO_REGION | typeof WORLD_REGION;
+
+export type AviationScope = "sao_paulo" | "worldwide";
+
+export function regionForScope(scope: string): AviationRegion {
+  if (scope === "sao_paulo") return SAO_PAULO_REGION;
+  if (scope === "worldwide") return WORLD_REGION;
+  throw new Error("AVIATION_SCOPE must be either 'sao_paulo' or 'worldwide'.");
+}
+
 export interface AircraftPosition {
   id: string;
   callsign: string | null;

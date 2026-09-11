@@ -5,6 +5,7 @@ import { tokenDigest } from "../src/auth/routes.js";
 import { hashPassword, verifyPassword } from "../src/auth/password.js";
 import type { AuthStore, Session } from "../src/auth/store.js";
 import type { AircraftService } from "../src/aircraft/service.js";
+import { WORLD_REGION } from "../src/aircraft/types.js";
 
 const password = "test-only-password-42";
 const user = {
@@ -61,6 +62,7 @@ function setup(
 
 test("live aircraft are available only to authenticated users", async (context) => {
   const aircraft: AircraftService = {
+    region: WORLD_REGION,
     async getRoute(id) {
       return id === "e49001"
         ? {
@@ -125,7 +127,7 @@ test("live aircraft are available only to authenticated users", async (context) 
     404,
   );
   assert.equal(live.json().provider, "Test provider");
-  assert.equal(live.json().region.name, "São Paulo region");
+  assert.equal(live.json().region.name, "Worldwide");
 });
 
 test("password hashes use random salts and verify without storing plaintext", async () => {

@@ -1,6 +1,7 @@
 import type { FlightRoute } from "./flight-routes.js";
 import {
   AircraftProviderError,
+  type AviationRegion,
   type AircraftPosition,
   type AircraftProvider,
   type GeographicBounds,
@@ -16,6 +17,7 @@ export interface AircraftSnapshot {
 }
 
 export interface AircraftService {
+  readonly region?: AviationRegion;
   getAircraft(): Promise<AircraftSnapshot>;
   getRoute?(id: string): Promise<FlightRoute | null>;
 }
@@ -35,7 +37,7 @@ export function createAircraftService(
   bounds: GeographicBounds,
   options: ServiceOptions = {},
 ): AircraftService {
-  const cacheTtlMs = options.cacheTtlMs ?? 300000;
+  const cacheTtlMs = options.cacheTtlMs ?? 120000;
   const staleTtlMs = options.staleTtlMs ?? 900000;
   const now = options.now ?? Date.now;
   let cached: CachedSnapshot | null = null;

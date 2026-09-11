@@ -259,12 +259,12 @@ test("normalized live aircraft feed is displayed without exposing provider reque
         cached: false,
         stale: false,
         region: {
-          name: "São Paulo region",
+          name: "Worldwide",
           bounds: {
-            minimumLatitude: -25.5,
-            maximumLatitude: -20.5,
-            minimumLongitude: -49.5,
-            maximumLongitude: -44.5,
+            minimumLatitude: -90,
+            maximumLatitude: 90,
+            minimumLongitude: -180,
+            maximumLongitude: 180,
           },
         },
       }),

@@ -146,7 +146,7 @@ export default function Globe({ expire }: { expire: () => void }) {
           });
         })
         .finally(() => {
-          if (!abort.signal.aborted) timer = setTimeout(refresh, 30000);
+          if (!abort.signal.aborted) timer = setTimeout(refresh, 120000);
         });
     };
     refresh();
@@ -183,7 +183,15 @@ export default function Globe({ expire }: { expire: () => void }) {
           <span /> EARTH EXPLORER
         </div>
         <h1 id="earth-heading">Airspace, alive.</h1>
-        <p>Live aircraft over the São Paulo region.</p>
+        <p>
+          Live aircraft ·{" "}
+          {feed.status === "ready" ||
+          feed.status === "empty" ||
+          feed.status === "stale"
+            ? feed.data.region.name
+            : "configured coverage"}
+          .
+        </p>
       </div>
       <nav className="region-nav" aria-label="Geographic navigation">
         {regions.map((region) => (

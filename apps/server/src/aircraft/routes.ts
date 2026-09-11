@@ -47,7 +47,7 @@ export async function registerAircraftRoutes(
         const snapshot = await service.getAircraft();
         return {
           ...snapshot,
-          region: SAO_PAULO_REGION,
+          region: service.region ?? SAO_PAULO_REGION,
         };
       } catch (error) {
         if (error instanceof AircraftProviderError) {

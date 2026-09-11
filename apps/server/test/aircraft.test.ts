@@ -7,7 +7,9 @@ import {
 import { createAircraftService } from "../src/aircraft/service.js";
 import {
   AircraftProviderError,
+  regionForScope,
   SAO_PAULO_REGION,
+  WORLD_REGION,
   type AircraftProvider,
 } from "../src/aircraft/types.js";
 
@@ -27,6 +29,12 @@ const state = [
   null,
   10_500,
 ];
+
+test("aviation scope selects regional or worldwide bounds", () => {
+  assert.equal(regionForScope("sao_paulo"), SAO_PAULO_REGION);
+  assert.equal(regionForScope("worldwide"), WORLD_REGION);
+  assert.throws(() => regionForScope("invalid"), /AVIATION_SCOPE/);
+});
 
 test("OpenSky state vectors normalize without leaking provider arrays", () => {
   assert.deepEqual(normalizeOpenSkyState(state, 1_700_000_000), {
@@ -55,7 +63,7 @@ test("OpenSky state vectors normalize without leaking provider arrays", () => {
   );
 });
 
-test("OpenSky requests the configured region and drops positions that are missing", async () => {
+test("OpenSky requests worldwide coverage and drops positions that are missing", async () => {
   let requested: URL | null = null;
   const request = (async (input: string | URL | Request) => {
     requested = new URL(input instanceof Request ? input.url : input);
@@ -65,15 +73,15 @@ test("OpenSky requests the configured region and drops positions that are missin
     );
   }) as typeof fetch;
   const provider = new OpenSkyProvider({ fetch: request });
-  const result = await provider.fetchAircraft(SAO_PAULO_REGION.bounds);
+  const result = await provider.fetchAircraft(WORLD_REGION.bounds);
   assert.equal(result.aircraft.length, 1);
   assert.equal(result.remainingCredits, 399);
   assert.equal(requested!.pathname, "/api/states/all");
   assert.equal(requested!.searchParams.get("extended"), "1");
-  assert.equal(requested!.searchParams.get("lamin"), "-25.5");
-  assert.equal(requested!.searchParams.get("lamax"), "-20.5");
-  assert.equal(requested!.searchParams.get("lomin"), "-49.5");
-  assert.equal(requested!.searchParams.get("lomax"), "-44.5");
+  assert.equal(requested!.searchParams.get("lamin"), "-90");
+  assert.equal(requested!.searchParams.get("lamax"), "90");
+  assert.equal(requested!.searchParams.get("lomin"), "-180");
+  assert.equal(requested!.searchParams.get("lomax"), "180");
 });
 
 test("OpenSky OAuth tokens are cached and provider rate limits are explicit", async () => {

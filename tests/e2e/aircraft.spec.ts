@@ -229,7 +229,7 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
   await picker.selectOption("abc001");
   updateTelemetry = true;
   const refresh = page.waitForResponse("**/api/aircraft");
-  await page.clock.fastForward(31000);
+  await page.clock.fastForward(121000);
   await refresh;
   await expect(picker).toHaveValue("abc001");
   await page.clock.fastForward(30000);

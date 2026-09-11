@@ -3,7 +3,7 @@ import { createDatabase } from "./database.js";
 import { createAuthStore } from "./auth/store.js";
 import { OpenSkyProvider } from "./aircraft/opensky.js";
 import { createAircraftService } from "./aircraft/service.js";
-import { SAO_PAULO_REGION } from "./aircraft/types.js";
+import { regionForScope } from "./aircraft/types.js";
 import { enrichAircraft, syncAircraftCatalog } from "./aircraft/catalog.js";
 import { createFlightRouteLookup } from "./aircraft/flight-routes.js";
 const database = createDatabase();
@@ -20,7 +20,7 @@ if (
 )
   throw new Error("SESSION_TTL_SECONDS must be between 60 and 86400.");
 const aviationCacheSeconds = Number(
-  process.env.AVIATION_CACHE_TTL_SECONDS ?? 300,
+  process.env.AVIATION_CACHE_TTL_SECONDS ?? 120,
 );
 if (
   !Number.isInteger(aviationCacheSeconds) ||
@@ -28,18 +28,35 @@ if (
   aviationCacheSeconds > 3600
 )
   throw new Error("AVIATION_CACHE_TTL_SECONDS must be between 10 and 3600.");
+const aviationScope = process.env.AVIATION_SCOPE ?? "worldwide";
+const aviationRegion = regionForScope(aviationScope);
+const openSkyClientId = process.env.OPENSKY_CLIENT_ID?.trim();
+const openSkyClientSecret = process.env.OPENSKY_CLIENT_SECRET?.trim();
+if (Boolean(openSkyClientId) !== Boolean(openSkyClientSecret))
+  throw new Error(
+    "OPENSKY_CLIENT_ID and OPENSKY_CLIENT_SECRET must be configured together.",
+  );
+if (aviationScope === "worldwide" && !openSkyClientId)
+  throw new Error(
+    "Worldwide OpenSky coverage requires OPENSKY_CLIENT_ID and OPENSKY_CLIENT_SECRET.",
+  );
+if (!openSkyClientId && aviationCacheSeconds < 216)
+  throw new Error(
+    "Anonymous São Paulo coverage requires AVIATION_CACHE_TTL_SECONDS of at least 216.",
+  );
 const positions = createAircraftService(
   new OpenSkyProvider({
     baseUrl: process.env.AVIATION_API_BASE_URL,
     tokenUrl: process.env.OPENSKY_TOKEN_URL,
-    clientId: process.env.OPENSKY_CLIENT_ID,
-    clientSecret: process.env.OPENSKY_CLIENT_SECRET,
+    clientId: openSkyClientId,
+    clientSecret: openSkyClientSecret,
   }),
-  SAO_PAULO_REGION.bounds,
+  aviationRegion.bounds,
   { cacheTtlMs: aviationCacheSeconds * 1000 },
 );
 const lookupRoute = createFlightRouteLookup();
 const aircraft = {
+  region: aviationRegion,
   async getAircraft() {
     const snapshot = await positions.getAircraft();
     try {
