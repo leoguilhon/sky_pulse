@@ -3,7 +3,7 @@ import { createDatabase } from "./database.js";
 import { createAuthStore } from "./auth/store.js";
 import { OpenSkyProvider } from "./aircraft/opensky.js";
 import { createAircraftService } from "./aircraft/service.js";
-import { regionForScope } from "./aircraft/types.js";
+import { regionForScope, type GeographicBounds } from "./aircraft/types.js";
 import { enrichAircraft, syncAircraftCatalog } from "./aircraft/catalog.js";
 import { createFlightRouteLookup } from "./aircraft/flight-routes.js";
 const database = createDatabase();
@@ -57,8 +57,8 @@ const positions = createAircraftService(
 const lookupRoute = createFlightRouteLookup();
 const aircraft = {
   region: aviationRegion,
-  async getAircraft() {
-    const snapshot = await positions.getAircraft();
+  async getAircraft(bounds?: GeographicBounds) {
+    const snapshot = await positions.getAircraft(bounds);
     try {
       return {
         ...snapshot,

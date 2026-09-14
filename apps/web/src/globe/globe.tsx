@@ -41,6 +41,7 @@ export default function Globe({ expire }: { expire: () => void }) {
   const [feedAttempt, setFeedAttempt] = useState(0);
   const [feed, setFeed] = useState<FeedState>({ status: "loading" });
   const [aircraftCount, setAircraftCount] = useState(0);
+  const [viewport, setViewport] = useState<string | null>(null);
   useEffect(() => {
     const prune = () => {
       const fresh = freshAircraft(aircraft.current, Date.now());
@@ -78,6 +79,7 @@ export default function Globe({ expire }: { expire: () => void }) {
       setDetailsLoading,
       selectAircraft,
       setSelectedAircraft,
+      setViewport,
     )
       .then((instance) => {
         if (abort.signal.aborted) {
@@ -104,11 +106,12 @@ export default function Globe({ expire }: { expire: () => void }) {
     };
   }, [attempt]);
   useEffect(() => {
+    if (viewport === null) return;
     const abort = new AbortController();
     setFeed({ status: "loading" });
     let timer: ReturnType<typeof setTimeout> | undefined;
     const refresh = () => {
-      void api<AircraftResponse>("/api/aircraft", undefined, {
+      void api<AircraftResponse>(`/api/aircraft?${viewport}`, undefined, {
         signal: abort.signal,
         timeoutMs: 12000,
       })
@@ -149,12 +152,12 @@ export default function Globe({ expire }: { expire: () => void }) {
           if (!abort.signal.aborted) timer = setTimeout(refresh, 120000);
         });
     };
-    refresh();
+    timer = setTimeout(refresh, 250);
     return () => {
       abort.abort();
       clearTimeout(timer);
     };
-  }, [expire, feedAttempt]);
+  }, [expire, feedAttempt, viewport]);
   const closeInspection = () => {
     controller.current?.selectAircraft(null);
     selectAircraft(null);
@@ -166,7 +169,7 @@ export default function Globe({ expire }: { expire: () => void }) {
     if (feed.status === "loading") return "Connecting live aircraft…";
     if (feed.status === "error") return "Live aircraft unavailable";
     const count = aircraftCount;
-    const aircraftLabel = `${count} aircraft`;
+    const aircraftLabel = `${count} aircraft in view`;
     if (count === 0)
       return `No recent aircraft positions · ${feed.data.region.name}`;
     if (feed.status === "stale") return `Stale snapshot · ${aircraftLabel}`;

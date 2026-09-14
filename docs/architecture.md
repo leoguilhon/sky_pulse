@@ -75,3 +75,11 @@ The request loop remains sequential with two-minute scheduling after completion,
 MapLibre receives one batched GeoJSON update at up to 30 Hz during transitions. Animation stops when targets are reached, pauses in hidden tabs, honors reduced motion, and is canceled on renderer disposal. Aircraft source loading events do not mark geographic tiles as loading. Only the selected aircraft's sampled telemetry crosses into React, throttled to four updates per second, so its inspector remains synchronized without rerendering on every animation frame.
 
 Deterministic unit tests cover angular wrap, position/telemetry timestamp independence, scalar telemetry interpolation, transition interruption, cached/older observations, expiry, reappearance, missing headings and reduced motion. The isolated browser test also verifies periodic telemetry refresh, inspector updates and selected-aircraft expiry during a feed failure.
+
+## Phase 7: geographic scaling
+
+Viewport queries filter the shared configured-coverage snapshot before catalog enrichment. Different users and camera positions do not create provider cache keys or additional upstream polling streams. Concurrent cache misses remain coalesced, including during provider cooldowns. Bounds validation rejects incomplete, nonnumeric, out-of-range and inverted latitude inputs, while supporting wrapped longitude intervals.
+
+The renderer reports MapLibre's geographic bounds on load, moveend and resize. Normalization preserves antimeridian crossings, full longitude spans and poles. A 10% margin reduces edge churn; the client debounces requests and aborts superseded effects, retaining the previous snapshot during loading or recoverable failures. Each accepted snapshot replaces the displayed set and clears missing selection. Existing expiry and telemetry interpolation continue unchanged.
+
+Points below zoom 4, silhouettes from zoom 4 and callsigns from zoom 9 share one source. Callsigns use collision placement. Synthetic profiling motivated a 15 Hz animation ceiling above 5,000 positions; smaller snapshots retain 30 Hz. The benchmark isolates filtering and client data preparation, and does not claim a GPU frame rate. See performance.md for measurements and a browser profiling procedure.

@@ -2,7 +2,7 @@
 
 Explore the world's air traffic in real time.
 
-SkyPulse includes the Docker foundation, authentication, an interactive Earth, live aircraft, aircraft inspection, and Phase 6 smooth movement. Sign in to explore a 3D globe with real continent outlines, rotation, zoom, geographic navigation, and a live worldwide aircraft snapshot from OpenSky Network.
+SkyPulse includes the Docker foundation, authentication, an interactive Earth, live aircraft, aircraft inspection, smooth movement, and Phase 7 geographic scaling. Sign in to explore a 3D globe with real continent outlines, rotation, zoom, geographic navigation, and a live worldwide aircraft snapshot from OpenSky Network.
 
 ## Start with Docker
 
@@ -181,3 +181,13 @@ The `updated_at` user field is initialized by the schema; future user updates mu
 - `PROJECT_CONTEXT.md`: product direction and phase roadmap.
 
 Phase 4 is implemented with a provider abstraction, normalized regional OpenSky data, shared rate-aware caching, graceful feed states, and batched aircraft rendering. Phase 5 adds aircraft selection, an inspection panel, heading-oriented category silhouettes, and a gold selection highlight. Phase 6 adds position/heading interpolation and observation-based expiry while preserving provider rate limits. This is a local development environment; production requires TLS termination, deployment secret management, separate migration/runtime database roles, validation of provider licensing for the intended use, and appropriate login limiting for the deployment size.
+
+## Geographic scaling (Phase 7)
+
+The map requests a padded bounding box after load, navigation and resize. A 250 ms debounce coalesces changes; obsolete requests are canceled and cannot replace the latest view. The regular two-minute refresh remains active for the current area. Counts and the aircraft picker describe the requested area, including a 10% edge margin; selection clears when an aircraft leaves the returned area.
+
+Authenticated `GET /api/aircraft` accepts four optional parameters: `minimumLatitude`, `maximumLatitude`, `minimumLongitude`, and `maximumLongitude`. Supply all four or none. Latitudes range from -90 to 90 with minimum at or below maximum; longitudes range from -180 to 180. West greater than east denotes an antimeridian crossing. Omitting bounds retains the configured full snapshot. Out-of-coverage boxes return an empty list. Filtering precedes catalog enrichment and response serialization. All viewports reuse one provider snapshot and its existing cache/rate-limit policy.
+
+Zoom below 4 uses selectable points; zoom 4 and above uses heading-oriented silhouettes; zoom 9 adds collision-managed callsigns. Selection retains its gold ring at every zoom. One shared GeoJSON source drives all layers. Dense views above 5,000 aircraft update at up to 15 Hz, while smaller views retain 30 Hz. No aircraft are silently sampled away.
+
+Run `npm run profile:aircraft` for deterministic synthetic regional (1,000) and worldwide (20,000) workloads. See [performance measurements](docs/performance.md) for scope and limitations.

@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { AircraftProviderError } from "./types.js";
 import { SAO_PAULO_REGION } from "./types.js";
 import type { AircraftService } from "./service.js";
+import type { GeographicBounds } from "./types.js";
 
 type SessionGuard = (
   request: FastifyRequest,
@@ -39,12 +40,40 @@ export async function registerAircraftRoutes(
       return route;
     },
   );
-  app.get(
+  app.get<{ Querystring: Partial<GeographicBounds> }>(
     "/api/aircraft",
-    { preHandler: requireSession },
+    {
+      preHandler: requireSession,
+      schema: {
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            minimumLatitude: { type: "number", minimum: -90, maximum: 90 },
+            maximumLatitude: { type: "number", minimum: -90, maximum: 90 },
+            minimumLongitude: { type: "number", minimum: -180, maximum: 180 },
+            maximumLongitude: { type: "number", minimum: -180, maximum: 180 },
+          },
+        },
+      },
+    },
     async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      const query = request.query;
+      const values = Object.values(query);
+      if (
+        values.length &&
+        (values.length !== 4 || query.minimumLatitude! > query.maximumLatitude!)
+      ) {
+        return reply.code(400).send({
+          code: "INVALID_INPUT",
+          message: "Provide all four bounds with south at or below north.",
+        });
+      }
       try {
-        const snapshot = await service.getAircraft();
+        const snapshot = await service.getAircraft(
+          values.length ? (query as GeographicBounds) : undefined,
+        );
         return {
           ...snapshot,
           region: service.region ?? SAO_PAULO_REGION,

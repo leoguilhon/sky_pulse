@@ -1,5 +1,118 @@
 import { test, expect } from "@playwright/test";
 
+test("viewport navigation filters the feed and global points remain selectable", async ({
+  page,
+}) => {
+  const failures: string[] = [];
+  page.on("pageerror", (error) => failures.push(error.message));
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
+      json: {
+        user: { id: "test-user", email: "pilot@example.test" },
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+      },
+    }),
+  );
+  await page.route("**/api/workspace", (route) =>
+    route.fulfill({ json: { message: "Ready" } }),
+  );
+  await page.route("**/maps/style.json", (route) =>
+    route.fulfill({
+      json: {
+        version: 8,
+        sources: {},
+        layers: [
+          {
+            id: "background",
+            type: "background",
+            paint: { "background-color": "#060e17" },
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/aircraft/abc001/route", (route) =>
+    route.fulfill({
+      json: {
+        status: "no-callsign",
+        callsign: null,
+        source: "test",
+        origin: null,
+        destination: null,
+        via: [],
+        airline: null,
+        flightNumber: null,
+      },
+    }),
+  );
+  const queries: URLSearchParams[] = [];
+  await page.route("**/api/aircraft?*", (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    queries.push(query);
+    const latitude = -15,
+      longitude = -52;
+    const visible =
+      latitude >= Number(query.get("minimumLatitude")) &&
+      latitude <= Number(query.get("maximumLatitude")) &&
+      longitude >= Number(query.get("minimumLongitude")) &&
+      longitude <= Number(query.get("maximumLongitude"));
+    const timestamp = new Date().toISOString();
+    return route.fulfill({
+      json: {
+        aircraft: visible
+          ? [
+              {
+                id: "abc001",
+                callsign: null,
+                category: "light",
+                latitude,
+                longitude,
+                altitudeMeters: 10000,
+                speedMetersPerSecond: 200,
+                headingDegrees: 90,
+                verticalRateMetersPerSecond: 0,
+                onGround: false,
+                originCountry: null,
+                lastUpdated: timestamp,
+                positionUpdatedAt: timestamp,
+              },
+            ]
+          : [],
+        observedAt: timestamp,
+        fetchedAt: timestamp,
+        cached: true,
+        stale: false,
+        provider: "test",
+        region: { name: "Worldwide", bounds: {} },
+      },
+    });
+  });
+  await page.goto("/app");
+  await expect(page.getByLabel("Inspect aircraft")).toBeVisible();
+  const canvas = page.getByRole("img", { name: "Interactive 3D Earth" });
+  const box = (await canvas.boundingBox())!;
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await expect(page.getByRole("complementary")).toBeVisible();
+  const initial = queries[0]!;
+  await page.getByRole("button", { name: "São Paulo", exact: true }).click();
+  await expect(page.getByLabel("Map zoom")).toHaveText("11.0 / 18");
+  await expect(page.getByLabel("Inspect aircraft")).toHaveCount(0);
+  await expect(page.getByRole("complementary")).toHaveCount(0);
+  expect(queries.length).toBeGreaterThan(1);
+  const local = queries.at(-1)!;
+  expect(
+    Number(local.get("maximumLatitude")) - Number(local.get("minimumLatitude")),
+  ).toBeLessThan(1);
+  expect(local.toString()).not.toBe(initial.toString());
+  await page.getByRole("button", { name: "Brazil", exact: true }).click();
+  await expect(page.getByLabel("Inspect aircraft")).toBeVisible();
+  const beforeResize = queries.length;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => queries.length).toBeGreaterThan(beforeResize);
+  expect(failures).toEqual([]);
+});
+
 test("aircraft can be inspected by click and keyboard with distinct silhouettes", async ({
   page,
 }, testInfo) => {
@@ -75,7 +188,7 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
     route.fulfill({ json: { message: "Ready" } }),
   );
   let updateTelemetry = false;
-  await page.route("**/api/aircraft", (route) => {
+  await page.route("**/api/aircraft?*", (route) => {
     const timestamp = new Date(
       Date.parse(initialTimestamp) + 30000,
     ).toISOString();
@@ -228,7 +341,7 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
   await expect(picker).toHaveValue("");
   await picker.selectOption("abc001");
   updateTelemetry = true;
-  const refresh = page.waitForResponse("**/api/aircraft");
+  const refresh = page.waitForResponse("**/api/aircraft?*");
   await page.clock.fastForward(121000);
   await refresh;
   await expect(picker).toHaveValue("abc001");
@@ -237,7 +350,7 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
   await expect(page.getByRole("complementary")).toContainText("292 kt");
   await expect(page.getByRole("complementary")).toContainText("-1,969 ft/min");
   // Expiry must run independently of successful polling and clear inspection.
-  await page.route("**/api/aircraft", (route) => route.abort());
+  await page.route("**/api/aircraft?*", (route) => route.abort());
   await page.clock.fastForward(10 * 60 * 1000);
   await expect(picker).toHaveCount(0);
   await expect(page.getByRole("complementary")).toHaveCount(0);
