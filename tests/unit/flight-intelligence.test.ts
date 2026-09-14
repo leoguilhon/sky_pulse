@@ -130,6 +130,32 @@ test("route legs cross the date line without a world-spanning chord", () => {
     ),
   );
 });
+test("short equatorial and meridional routes bow visibly while keeping endpoints", () => {
+  for (const [origin, destination] of [
+    [airport(0), airport(2)],
+    [airport(0), airport(0, 2)],
+    [airport(-0.006, 43.1787), airport(2.55, 49.0097)],
+  ] as const) {
+    const line = routeGeometry(route(origin, destination)).features.find(
+      (feature) => feature.geometry.type === "LineString",
+    );
+    assert.ok(line?.geometry.type === "LineString");
+    const points = line.geometry.coordinates;
+    const start = points[0]!;
+    const end = points.at(-1)!;
+    const middle = points[64]!;
+    assert.ok(Math.abs(start[0]! - origin.longitude!) < 1e-9);
+    assert.ok(Math.abs(start[1]! - origin.latitude!) < 1e-9);
+    assert.ok(Math.abs(end[0]! - destination.longitude!) < 1e-9);
+    assert.ok(Math.abs(end[1]! - destination.latitude!) < 1e-9);
+    const dx = end[0]! - start[0]!;
+    const dy = end[1]! - start[1]!;
+    const deviation =
+      Math.abs(dx * (middle[1]! - start[1]!) - dy * (middle[0]! - start[0]!)) /
+      Math.hypot(dx, dy);
+    assert.ok(deviation > Math.hypot(dx, dy) * 0.1);
+  }
+});
 test("routes preserve stops, omit unknown legs and handle coincident, polar and antipodal endpoints", () => {
   assert.equal(routeGeometry(null).features.length, 0);
   assert.equal(

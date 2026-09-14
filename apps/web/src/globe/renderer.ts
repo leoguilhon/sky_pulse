@@ -1,5 +1,6 @@
 import { aircraftGeoJson } from "./aircraft-geojson";
 import { routeGeometry } from "./route-geometry";
+import { applyBasemapPalette } from "./basemap-palette";
 import type { Route } from "./route-types";
 import {
   Map,
@@ -121,25 +122,9 @@ export async function createGlobe(
     };
     layer.minzoom = Math.max(layer.minzoom ?? 0, minimumZoom[layer.id] ?? 0);
   }
-  const landColors: Record<string, string> = {
-    water: "#163a49",
-    landcover_ice_shelf: "#82969a",
-    landcover_glacier: "#82969a",
-    landuse_residential: "#3e504e",
-    landcover_wood: "#304c43",
-    landuse_park: "#38564b",
-    building: "#344340",
-    road_area_pier: "#455953",
-  };
+  applyBasemapPalette(style);
   // Keep the basemap quiet so live aircraft can own the visual hierarchy.
   for (const layer of style.layers) {
-    if (layer.type === "background") {
-      layer.paint = { ...layer.paint, "background-color": "#455953" };
-    }
-    if (layer.type === "fill" && landColors[layer.id]) {
-      layer.paint = { ...layer.paint, "fill-color": landColors[layer.id]! };
-      delete layer.paint["fill-pattern"];
-    }
     if (layer.type === "line" && layer.id === "waterway") {
       layer.paint = {
         ...layer.paint,
@@ -269,6 +254,7 @@ export async function createGlobe(
   };
   style.sources["flight-route"] = {
     type: "geojson",
+    tolerance: 0,
     data: routeGeometry(null),
   };
   style.layers.push(
@@ -277,6 +263,7 @@ export async function createGlobe(
       type: "line",
       source: "flight-route",
       filter: ["==", ["geometry-type"], "LineString"],
+      layout: { "line-cap": "round", "line-join": "round" },
       paint: {
         "line-color": "#ffd68a",
         "line-width": 2,
