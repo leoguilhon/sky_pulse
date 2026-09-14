@@ -1,5 +1,5 @@
 import type { FlightRoute } from "./flight-routes.js";
-import { filterAircraft } from "./geography.js";
+import { filterAircraft, searchAircraft } from "./geography.js";
 import {
   AircraftProviderError,
   type AviationRegion,
@@ -19,7 +19,10 @@ export interface AircraftSnapshot {
 
 export interface AircraftService {
   readonly region?: AviationRegion;
-  getAircraft(bounds?: GeographicBounds): Promise<AircraftSnapshot>;
+  getAircraft(
+    bounds?: GeographicBounds,
+    search?: string,
+  ): Promise<AircraftSnapshot>;
   getRoute?(id: string): Promise<FlightRoute | null>;
 }
 
@@ -112,11 +115,13 @@ export function createAircraftService(
     },
   };
   return {
-    async getAircraft(viewport) {
+    async getAircraft(viewport, search) {
       const snapshot = await shared.getAircraft();
       return {
         ...snapshot,
-        aircraft: filterAircraft(snapshot.aircraft, viewport),
+        aircraft: search
+          ? searchAircraft(snapshot.aircraft, search, now())
+          : filterAircraft(snapshot.aircraft, viewport),
       };
     },
   };

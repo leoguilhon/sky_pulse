@@ -40,7 +40,7 @@ export async function registerAircraftRoutes(
       return route;
     },
   );
-  app.get<{ Querystring: Partial<GeographicBounds> }>(
+  app.get<{ Querystring: Partial<GeographicBounds> & { search?: string } }>(
     "/api/aircraft",
     {
       preHandler: requireSession,
@@ -49,6 +49,12 @@ export async function registerAircraftRoutes(
           type: "object",
           additionalProperties: false,
           properties: {
+            search: {
+              type: "string",
+              minLength: 2,
+              maxLength: 8,
+              pattern: "^[a-zA-Z0-9]+$",
+            },
             minimumLatitude: { type: "number", minimum: -90, maximum: 90 },
             maximumLatitude: { type: "number", minimum: -90, maximum: 90 },
             minimumLongitude: { type: "number", minimum: -180, maximum: 180 },
@@ -59,11 +65,13 @@ export async function registerAircraftRoutes(
     },
     async (request, reply) => {
       reply.header("Cache-Control", "no-store");
-      const query = request.query;
+      const { search, ...query } = request.query;
       const values = Object.values(query);
       if (
         values.length &&
-        (values.length !== 4 || query.minimumLatitude! > query.maximumLatitude!)
+        (search ||
+          values.length !== 4 ||
+          query.minimumLatitude! > query.maximumLatitude!)
       ) {
         return reply.code(400).send({
           code: "INVALID_INPUT",
@@ -73,6 +81,7 @@ export async function registerAircraftRoutes(
       try {
         const snapshot = await service.getAircraft(
           values.length ? (query as GeographicBounds) : undefined,
+          search,
         );
         return {
           ...snapshot,

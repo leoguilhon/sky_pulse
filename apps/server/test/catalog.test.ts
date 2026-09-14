@@ -78,6 +78,8 @@ const airport = (icao: string) => ({
   name: `Airport ${icao}`,
   municipality: "City",
   country_name: "Brazil",
+  latitude: -23.5,
+  longitude: -46.6,
 });
 const response = () =>
   new Response(
@@ -113,6 +115,8 @@ test("route lookup normalizes callsigns, shares concurrent requests and expires 
   assert.equal(calls, 1);
   assert.deepEqual(first, second);
   assert.equal(first.origin?.icao, "SBRJ");
+  assert.equal(first.origin?.latitude, -23.5);
+  assert.equal(first.origin?.longitude, -46.6);
   assert.equal(first.destination?.icao, "SBSP");
   assert.equal(first.via[0]?.icao, "SBGL");
   assert.equal((await lookup(null)).status, "no-callsign");

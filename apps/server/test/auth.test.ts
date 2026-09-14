@@ -91,6 +91,7 @@ test("live aircraft are available only to authenticated users", async (context) 
   };
   const { app, login } = setup(context, false, aircraft);
   assert.equal((await app.inject("/api/aircraft")).statusCode, 401);
+  assert.equal((await app.inject("/api/aircraft?search=TEST")).statusCode, 401);
   assert.equal(
     (await app.inject("/api/aircraft/e49001/route")).statusCode,
     401,

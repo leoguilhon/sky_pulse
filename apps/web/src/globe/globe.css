@@ -361,10 +361,51 @@
     animation: none;
   }
 }
+.flight-search {
+  position: absolute;
+  z-index: 4;
+  top: 158px;
+  left: 36px;
+  width: 230px;
+  padding: 12px;
+  border: 1px solid #304653;
+  border-radius: 10px;
+  background: #0d1824f5;
+  font-size: 12px;
+}
+.flight-search label {
+  display: block;
+  margin-bottom: 8px;
+  color: #a6c3cf;
+}
+.flight-search input {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #45606d;
+  border-radius: 5px;
+  background: #102230;
+  color: #e5f2f3;
+}
+.flight-search ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.flight-search li button {
+  width: 100%;
+  text-align: left;
+  margin-top: 4px;
+}
+.flight-search p {
+  color: #a6c3cf;
+  line-height: 1.4;
+}
 .aircraft-picker {
   position: absolute;
   left: 36px;
-  top: 158px;
+  top: 270px;
   width: 230px;
   padding: 12px;
   background: #0d1824ed;
@@ -513,9 +554,14 @@
   line-height: 1.5;
 }
 @media (max-width: 750px) {
-  .aircraft-picker {
+  .flight-search {
     left: 20px;
     top: 220px;
+    width: 205px;
+  }
+  .aircraft-picker {
+    left: 20px;
+    top: 332px;
     width: 205px;
   }
   .aircraft-inspector {

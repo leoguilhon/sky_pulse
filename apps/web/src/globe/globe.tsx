@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import type { AircraftPosition, AircraftResponse } from "../aircraft";
 import { createGlobe, type GlobeController } from "./renderer";
@@ -6,6 +6,9 @@ import { HOME, type View } from "./geography";
 import "./globe.css";
 import { AircraftInspector, AircraftLegend } from "./aircraft-inspector";
 import { freshAircraft } from "./aircraft-motion";
+import { FlightSearch } from "./flight-search";
+import type { Airport, Route } from "./route-types";
+import { located } from "./route-geometry";
 
 const regions = [
   { name: "Brazil", latitude: -15, longitude: -52, zoom: 4 },
@@ -23,11 +26,27 @@ export default function Globe({ expire }: { expire: () => void }) {
   const host = useRef<HTMLDivElement>(null);
   const controller = useRef<GlobeController | null>(null);
   const aircraft = useRef<AircraftPosition[]>([]);
+  const route = useRef<Route | null>(null);
+  const airportPreview = useRef(false);
+  const showRoute = useCallback((value: Route | null) => {
+    route.current = value;
+    controller.current?.setRoute(value);
+  }, []);
+  const showAirport = (airport: Airport) => {
+    if (!located(airport)) return;
+    airportPreview.current = true;
+    controller.current?.goTo({
+      latitude: airport.latitude!,
+      longitude: airport.longitude!,
+      zoom: 10,
+    });
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedAircraft, setSelectedAircraft] =
     useState<AircraftPosition | null>(null);
   const selection = useRef<string | null>(null);
   const selectAircraft = (id: string | null) => {
+    if (selection.current !== id) airportPreview.current = false;
     selection.current = id;
     setSelectedId(id);
   };
@@ -42,6 +61,7 @@ export default function Globe({ expire }: { expire: () => void }) {
   const [feed, setFeed] = useState<FeedState>({ status: "loading" });
   const [aircraftCount, setAircraftCount] = useState(0);
   const [viewport, setViewport] = useState<string | null>(null);
+  const feedEpoch = useRef(0);
   useEffect(() => {
     const prune = () => {
       const fresh = freshAircraft(aircraft.current, Date.now());
@@ -90,6 +110,7 @@ export default function Globe({ expire }: { expire: () => void }) {
         const previousSelection = selection.current;
         instance.setAircraft(aircraft.current);
         instance.selectAircraft(previousSelection);
+        instance.setRoute(route.current);
         setState("ready");
       })
       .catch((failure: unknown) =>
@@ -107,6 +128,7 @@ export default function Globe({ expire }: { expire: () => void }) {
   }, [attempt]);
   useEffect(() => {
     if (viewport === null) return;
+    const epoch = ++feedEpoch.current;
     const abort = new AbortController();
     setFeed({ status: "loading" });
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -116,8 +138,18 @@ export default function Globe({ expire }: { expire: () => void }) {
         timeoutMs: 12000,
       })
         .then((data) => {
-          if (abort.signal.aborted) return;
-          aircraft.current = freshAircraft(data.aircraft, Date.now());
+          if (abort.signal.aborted || epoch !== feedEpoch.current) return;
+          // Airport navigation keeps the inspected observation until its normal
+          // expiry; it must not be refreshed from an unrelated viewport response.
+          const inspected = airportPreview.current
+            ? aircraft.current.find((p) => p.id === selection.current)
+            : undefined;
+          aircraft.current = freshAircraft(
+            inspected && !data.aircraft.some((p) => p.id === inspected.id)
+              ? [...data.aircraft, inspected]
+              : data.aircraft,
+            Date.now(),
+          );
           setAircraftCount(aircraft.current.length);
           controller.current?.setAircraft(aircraft.current);
           if (
@@ -135,7 +167,7 @@ export default function Globe({ expire }: { expire: () => void }) {
           });
         })
         .catch((failure: unknown) => {
-          if (abort.signal.aborted) return;
+          if (abort.signal.aborted || epoch !== feedEpoch.current) return;
           if (failure instanceof ApiError && failure.status === 401) {
             expire();
             return;
@@ -149,7 +181,8 @@ export default function Globe({ expire }: { expire: () => void }) {
           });
         })
         .finally(() => {
-          if (!abort.signal.aborted) timer = setTimeout(refresh, 120000);
+          if (!abort.signal.aborted && epoch === feedEpoch.current)
+            timer = setTimeout(refresh, 120000);
         });
     };
     timer = setTimeout(refresh, 250);
@@ -169,7 +202,7 @@ export default function Globe({ expire }: { expire: () => void }) {
     if (feed.status === "loading") return "Connecting live aircraft…";
     if (feed.status === "error") return "Live aircraft unavailable";
     const count = aircraftCount;
-    const aircraftLabel = `${count} aircraft in view`;
+    const aircraftLabel = `${count} aircraft loaded`;
     if (count === 0)
       return `No recent aircraft positions · ${feed.data.region.name}`;
     if (feed.status === "stale") return `Stale snapshot · ${aircraftLabel}`;
@@ -178,6 +211,31 @@ export default function Globe({ expire }: { expire: () => void }) {
   return (
     <section className="earth-workspace" aria-labelledby="earth-heading">
       <div className="globe-canvas" ref={host} />
+      {state === "ready" && (
+        <FlightSearch
+          expire={expire}
+          onSelect={(position) => {
+            if (!freshAircraft([position], Date.now()).length) return;
+            // The previous viewport must not erase a result during camera travel.
+            feedEpoch.current++;
+            setViewport(null);
+            setFeedAttempt((value) => value + 1);
+            airportPreview.current = false;
+            aircraft.current = [
+              ...aircraft.current.filter((p) => p.id !== position.id),
+              position,
+            ];
+            setAircraftCount(aircraft.current.length);
+            controller.current?.setAircraft(aircraft.current);
+            controller.current?.selectAircraft(position.id);
+            controller.current?.goTo({
+              latitude: position.latitude,
+              longitude: position.longitude,
+              zoom: 7,
+            });
+          }}
+        />
+      )}
       <p className="sr-only" aria-label="Visible place names">
         {places.join(", ")}
       </p>
@@ -267,6 +325,8 @@ export default function Globe({ expire }: { expire: () => void }) {
       )}
       {selectedAircraft && state === "ready" && (
         <AircraftInspector
+          onRoute={showRoute}
+          onAirport={showAirport}
           key={`${selectedAircraft.id}/${selectedAircraft.callsign}`}
           expire={expire}
           aircraft={selectedAircraft}

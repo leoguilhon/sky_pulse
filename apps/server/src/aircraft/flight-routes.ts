@@ -4,6 +4,8 @@ export interface RouteAirport {
   name: string;
   city: string | null;
   country: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 export interface FlightRoute {
   status: "available" | "not-found" | "unavailable" | "no-callsign";
@@ -35,6 +37,18 @@ function airport(value: unknown): RouteAirport | null {
     iata: text(row.iata_code),
     city: text(row.municipality),
     country: text(row.country_name),
+    latitude:
+      typeof row.latitude === "number" &&
+      Number.isFinite(row.latitude) &&
+      Math.abs(row.latitude) <= 90
+        ? row.latitude
+        : null,
+    longitude:
+      typeof row.longitude === "number" &&
+      Number.isFinite(row.longitude) &&
+      Math.abs(row.longitude) <= 180
+        ? row.longitude
+        : null,
   };
 }
 

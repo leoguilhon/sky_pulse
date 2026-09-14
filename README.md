@@ -2,7 +2,7 @@
 
 Explore the world's air traffic in real time.
 
-SkyPulse includes the Docker foundation, authentication, an interactive Earth, live aircraft, aircraft inspection, smooth movement, and Phase 7 geographic scaling. Sign in to explore a 3D globe with real continent outlines, rotation, zoom, geographic navigation, and a live worldwide aircraft snapshot from OpenSky Network.
+SkyPulse includes the Docker foundation, authentication, an interactive Earth, live aircraft, aircraft inspection, smooth movement, geographic scaling, and Phase 8 flight intelligence. Sign in to explore a 3D globe with real continent outlines, rotation, zoom, geographic navigation, and a live worldwide aircraft snapshot from OpenSky Network.
 
 ## Start with Docker
 
@@ -184,10 +184,22 @@ Phase 4 is implemented with a provider abstraction, normalized regional OpenSky 
 
 ## Geographic scaling (Phase 7)
 
-The map requests a padded bounding box after load, navigation and resize. A 250 ms debounce coalesces changes; obsolete requests are canceled and cannot replace the latest view. The regular two-minute refresh remains active for the current area. Counts and the aircraft picker describe the requested area, including a 10% edge margin; selection clears when an aircraft leaves the returned area.
+The map requests a padded bounding box after load, navigation and resize. A 250 ms debounce coalesces changes; obsolete requests are canceled and cannot replace the latest view. The regular two-minute refresh remains active for the current area. The aircraft picker includes the requested area with a 10% edge margin. Normal navigation clears selection when an aircraft leaves the returned area; Phase 8 airport navigation retains the inspected observation until its normal expiry. The loaded-aircraft count includes that retained observation.
 
 Authenticated `GET /api/aircraft` accepts four optional parameters: `minimumLatitude`, `maximumLatitude`, `minimumLongitude`, and `maximumLongitude`. Supply all four or none. Latitudes range from -90 to 90 with minimum at or below maximum; longitudes range from -180 to 180. West greater than east denotes an antimeridian crossing. Omitting bounds retains the configured full snapshot. Out-of-coverage boxes return an empty list. Filtering precedes catalog enrichment and response serialization. All viewports reuse one provider snapshot and its existing cache/rate-limit policy.
 
 Zoom below 4 uses selectable points; zoom 4 and above uses heading-oriented silhouettes; zoom 9 adds collision-managed callsigns. Selection retains its gold ring at every zoom. One shared GeoJSON source drives all layers. Dense views above 5,000 aircraft update at up to 15 Hz, while smaller views retain 30 Hz. No aircraft are silently sampled away.
 
 Run `npm run profile:aircraft` for deterministic synthetic regional (1,000) and worldwide (20,000) workloads. See [performance measurements](docs/performance.md) for scope and limitations.
+
+## Flight intelligence (Phase 8)
+
+Use **Find a flight** to search the configured coverage by callsign (for example GLO1001) or ICAO24 address, even outside the current map viewport. Search accepts 2?8 letters or numbers, ignores case, prioritizes exact matches and returns at most 20 recent observations. Selecting a result centers the camera and opens inspection. This is a live-snapshot search, not a schedule or historical-flight search; IATA flight numbers displayed in route references are not indexed. Regional configuration searches only that region.
+
+The authenticated aircraft endpoint also supports `GET /api/aircraft?search=GLO`. Search cannot be combined with bounding-box parameters. Searches share the existing provider snapshot, filter before catalog enrichment and exclude observations older than ten minutes. No per-result route lookup or additional provider feed is started. The browser debounces input, cancels obsolete requests and reports empty, stale, unavailable and expired-session states.
+
+Inspection combines aircraft metadata, airline, flight-number reference, origin, intermediate stops and destination. Airport coordinates from [adsbdb's documented route response](https://github.com/mrjackwills/adsbdb) are validated server-side. Known airports appear as gold outlined markers with code labels, and **View airport on map** focuses their location. While visiting a route airport, inspection retains its last aircraft observation until normal expiry; its timestamp is not renewed by local feed requests. Closing inspection or selecting another aircraft clears the previous route.
+
+Dashed great-circle arcs connect consecutive known airports and preserve intermediate stops. They depict a callsign route reference, not a flown track, confirmed flight plan or aircraft prediction. Missing coordinates leave airport text available and omit the affected leg, without inventing a direct bypass. Identical endpoints and exactly antipodal endpoints omit their ambiguous/degenerate arc. Date-line crossings are split into local segments. Airport support in this phase covers the selected route; a worldwide airport directory, airport search and arrival/departure boards remain future work.
+
+Validation: `npm run check`, `npm run build`, and the isolated browser suites `tests/e2e/aircraft.spec.ts` and `tests/e2e/flight-intelligence.spec.ts`. They use deterministic feed/route fixtures without external map services or provider credentials.

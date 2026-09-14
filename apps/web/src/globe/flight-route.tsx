@@ -1,50 +1,40 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 
-interface Airport {
-  icao: string;
-  iata: string | null;
-  name: string;
-  city: string | null;
-  country: string | null;
-}
-interface Route {
-  status: "available" | "not-found" | "unavailable" | "no-callsign";
-  callsign: string | null;
-  source: string;
-  fetchedAt: string;
-  origin: Airport | null;
-  destination: Airport | null;
-  via: Airport[];
-  airline: string | null;
-  flightNumber: string | null;
-}
-
+import type { Route, Airport } from "./route-types";
 export function FlightRoute({
   id,
   callsign,
   expire,
+  onRoute,
+  onAirport,
 }: {
   id: string;
   callsign: string | null;
   expire: () => void;
+  onRoute: (route: Route | null) => void;
+  onAirport: (airport: Airport) => void;
 }) {
   const [route, setRoute] = useState<Route | null>(null);
   const [loading, setLoading] = useState(Boolean(callsign));
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    onRoute(null);
+    setRoute(null);
+    setLoading(Boolean(callsign));
+    setFailed(false);
     if (!callsign) return;
     const abort = new AbortController();
-    setLoading(true);
-    setFailed(false);
-    setRoute(null);
     void api<Route>(`/api/aircraft/${id}/route`, undefined, {
       signal: abort.signal,
       timeoutMs: 10000,
     })
       .then((data) => {
-        if (!abort.signal.aborted) setRoute(data);
+        if (!abort.signal.aborted) {
+          setRoute(data);
+          onRoute(data);
+        }
       })
       .catch((error: unknown) => {
         if (abort.signal.aborted) return;
@@ -54,8 +44,11 @@ export function FlightRoute({
       .finally(() => {
         if (!abort.signal.aborted) setLoading(false);
       });
-    return () => abort.abort();
-  }, [id, callsign, expire, attempt]);
+    return () => {
+      abort.abort();
+      onRoute(null);
+    };
+  }, [id, callsign, expire, attempt, onRoute]);
   return (
     <section className="flight-route" aria-label="Flight route">
       <h3>Origin & destination</h3>
@@ -67,12 +60,21 @@ export function FlightRoute({
             {(
               [
                 ["Origin", route.origin],
+                ...route.via.map(
+                  (airport, index) => [`Stop ${index + 1}`, airport] as const,
+                ),
                 ["Destination", route.destination],
               ] as const
             ).map(([label, airport]) => (
               <div key={label}>
                 <span className="hud-label">{label}</span>
                 <strong>{airport.iata ?? airport.icao}</strong>
+                {typeof airport.latitude === "number" &&
+                  typeof airport.longitude === "number" && (
+                    <button onClick={() => onAirport(airport)}>
+                      View {airport.iata ?? airport.icao} on map
+                    </button>
+                  )}
                 <p>{airport.name}</p>
                 <small>
                   {[airport.city, airport.country].filter(Boolean).join(", ")} ·{" "}
@@ -81,20 +83,19 @@ export function FlightRoute({
               </div>
             ))}
           </div>
-          {route.via.length > 0 && (
-            <p>
-              Via{" "}
-              {route.via
-                .map(
-                  (airport) =>
-                    `${airport.iata ?? airport.icao} (${airport.name})`,
-                )
-                .join(", ")}
-            </p>
-          )}
           {(route.airline || route.flightNumber) && (
             <p>
               {[route.airline, route.flightNumber].filter(Boolean).join(" · ")}
+            </p>
+          )}
+          {[route.origin, ...route.via, route.destination].some(
+            (airport) =>
+              typeof airport.latitude !== "number" ||
+              typeof airport.longitude !== "number",
+          ) && (
+            <p>
+              Some airport coordinates are unavailable; only known route
+              segments can be mapped.
             </p>
           )}
           <p className="route-reference">

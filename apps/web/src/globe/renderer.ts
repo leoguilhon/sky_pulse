@@ -1,4 +1,6 @@
 import { aircraftGeoJson } from "./aircraft-geojson";
+import { routeGeometry } from "./route-geometry";
+import type { Route } from "./route-types";
 import {
   Map,
   AttributionControl,
@@ -23,6 +25,7 @@ export interface GlobeController {
   rotate(latitude: number, longitude: number): void;
   setAircraft(aircraft: AircraftPosition[]): void;
   selectAircraft(id: string | null): void;
+  setRoute(route: Route | null): void;
   dispose(): void;
 }
 
@@ -264,6 +267,54 @@ export async function createGlobe(
     type: "geojson",
     data: aircraftGeoJson([]),
   };
+  style.sources["flight-route"] = {
+    type: "geojson",
+    data: routeGeometry(null),
+  };
+  style.layers.push(
+    {
+      id: "flight-route-arc",
+      type: "line",
+      source: "flight-route",
+      filter: ["==", ["geometry-type"], "LineString"],
+      paint: {
+        "line-color": "#ffd68a",
+        "line-width": 2,
+        "line-dasharray": [3, 2],
+        "line-opacity": 0.8,
+      },
+    },
+    {
+      id: "flight-route-airports",
+      type: "circle",
+      source: "flight-route",
+      filter: ["==", ["geometry-type"], "Point"],
+      paint: {
+        "circle-color": "#060e17",
+        "circle-radius": 6,
+        "circle-stroke-color": "#ffd68a",
+        "circle-stroke-width": 2,
+      },
+    },
+  );
+  if (style.glyphs)
+    style.layers.push({
+      id: "flight-route-airport-labels",
+      type: "symbol",
+      source: "flight-route",
+      filter: ["==", ["geometry-type"], "Point"],
+      layout: {
+        "text-field": ["get", "code"],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": 12,
+        "text-offset": [0, 1.5],
+      },
+      paint: {
+        "text-color": "#ffd68a",
+        "text-halo-color": "#060e17",
+        "text-halo-width": 1,
+      },
+    });
   style.layers.push(
     {
       id: "aircraft-glow",
@@ -400,6 +451,13 @@ export async function createGlobe(
   });
   let disposed = false;
   let latestAircraft: AircraftPosition[] = [];
+  let latestRoute: Route | null = null;
+  function setRoute(route: Route | null) {
+    latestRoute = route;
+    if (disposed) return;
+    const source = map.getSource("flight-route") as GeoJSONSource | undefined;
+    source?.setData(routeGeometry(route));
+  }
   const motion = new AircraftMotion();
   let animationFrame = 0;
   let lastAnimation = 0;
@@ -567,6 +625,7 @@ export async function createGlobe(
       );
   });
   map.on("load", report);
+  map.on("load", () => setRoute(latestRoute));
   map.on("load", reportViewport);
   map.on("moveend", reportViewport);
   map.on("resize", reportViewport);
@@ -576,7 +635,10 @@ export async function createGlobe(
   map.on("resize", updateFocus);
   map.on("movestart", () => onLoading(true));
   map.on("dataloading", (event) => {
-    if (!("sourceId" in event) || event.sourceId !== AIRCRAFT_SOURCE) {
+    if (
+      !("sourceId" in event) ||
+      (event.sourceId !== AIRCRAFT_SOURCE && event.sourceId !== "flight-route")
+    ) {
       detailsDirty = true;
       onLoading(true);
     }
@@ -628,6 +690,7 @@ export async function createGlobe(
     zoom,
     rotate,
     selectAircraft,
+    setRoute,
     setAircraft(aircraft) {
       if (disposed) return;
       motion.update(aircraft, Date.now(), reducedMotion.matches);

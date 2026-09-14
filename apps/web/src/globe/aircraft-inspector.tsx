@@ -1,6 +1,7 @@
 import type { AircraftPosition } from "../aircraft";
 import { aircraftSymbol, aircraftSymbols } from "./aircraft-symbols";
 import { FlightRoute } from "./flight-route";
+import type { Airport, Route } from "./route-types";
 
 const measurement = (
   value: number | null,
@@ -18,12 +19,16 @@ export function AircraftInspector({
   provider,
   onClose,
   expire,
+  onRoute,
+  onAirport,
 }: {
   aircraft: AircraftPosition;
   stale: boolean;
   provider: string;
   onClose: () => void;
   expire: () => void;
+  onRoute: (route: Route | null) => void;
+  onAirport: (airport: Airport) => void;
 }) {
   const symbol = aircraftSymbols[aircraftSymbol(aircraft)];
   const fields = [
@@ -93,6 +98,8 @@ export function AircraftInspector({
         id={aircraft.id}
         callsign={aircraft.callsign}
         expire={expire}
+        onRoute={onRoute}
+        onAirport={onAirport}
       />
       <dl>
         {fields.map(([label, value]) => (

@@ -57,8 +57,8 @@ const positions = createAircraftService(
 const lookupRoute = createFlightRouteLookup();
 const aircraft = {
   region: aviationRegion,
-  async getAircraft(bounds?: GeographicBounds) {
-    const snapshot = await positions.getAircraft(bounds);
+  async getAircraft(bounds?: GeographicBounds, search?: string) {
+    const snapshot = await positions.getAircraft(bounds, search);
     try {
       return {
         ...snapshot,
