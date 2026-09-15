@@ -340,15 +340,26 @@ test("aircraft can be inspected by click and keyboard with distinct silhouettes"
   await page.keyboard.press("Escape");
   await expect(picker).toHaveValue("");
   await picker.selectOption("abc001");
+  const stationaryCamera = await page
+    .getByLabel("Camera coordinates")
+    .textContent();
+  const stationaryZoom = await page.getByLabel("Map zoom").textContent();
+  await expect(page.getByRole("complementary")).toContainText("-46.6333");
   updateTelemetry = true;
   const refresh = page.waitForResponse("**/api/aircraft?*");
-  await page.clock.fastForward(121000);
+  // Poll and animate new positions without any camera or zoom interaction.
+  await page.clock.fastForward(11000);
   await refresh;
   await expect(picker).toHaveValue("abc001");
   await page.clock.fastForward(30000);
   await expect(page.getByRole("complementary")).toContainText("29,528 ft");
   await expect(page.getByRole("complementary")).toContainText("292 kt");
   await expect(page.getByRole("complementary")).toContainText("-1,969 ft/min");
+  await expect(page.getByRole("complementary")).toContainText("-46.6233");
+  await expect(page.getByLabel("Camera coordinates")).toHaveText(
+    stationaryCamera!,
+  );
+  await expect(page.getByLabel("Map zoom")).toHaveText(stationaryZoom!);
   // Expiry must run independently of successful polling and clear inspection.
   await page.route("**/api/aircraft?*", (route) => route.abort());
   await page.clock.fastForward(10 * 60 * 1000);

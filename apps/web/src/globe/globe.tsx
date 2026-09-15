@@ -10,6 +10,8 @@ import { FlightSearch } from "./flight-search";
 import type { Airport, Route } from "./route-types";
 import { located } from "./route-geometry";
 
+const AIRCRAFT_REFRESH_MS = 10000;
+
 const regions = [
   { name: "Brazil", latitude: -15, longitude: -52, zoom: 4 },
   { name: "Europe", latitude: 48, longitude: 15, zoom: 3 },
@@ -132,7 +134,11 @@ export default function Globe({ expire }: { expire: () => void }) {
     const abort = new AbortController();
     setFeed({ status: "loading" });
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let refreshing = false;
     const refresh = () => {
+      if (abort.signal.aborted || refreshing) return;
+      clearTimeout(timer);
+      refreshing = true;
       void api<AircraftResponse>(`/api/aircraft?${viewport}`, undefined, {
         signal: abort.signal,
         timeoutMs: 12000,
@@ -181,14 +187,20 @@ export default function Globe({ expire }: { expire: () => void }) {
           });
         })
         .finally(() => {
+          refreshing = false;
           if (!abort.signal.aborted && epoch === feedEpoch.current)
-            timer = setTimeout(refresh, 120000);
+            timer = setTimeout(refresh, AIRCRAFT_REFRESH_MS);
         });
     };
+    const resume = () => {
+      if (!document.hidden) refresh();
+    };
     timer = setTimeout(refresh, 250);
+    document.addEventListener("visibilitychange", resume);
     return () => {
       abort.abort();
       clearTimeout(timer);
+      document.removeEventListener("visibilitychange", resume);
     };
   }, [expire, feedAttempt, viewport]);
   const closeInspection = () => {
