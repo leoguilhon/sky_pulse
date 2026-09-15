@@ -95,10 +95,12 @@ test("viewport navigation filters the feed and global points remain selectable",
   await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
   await expect(page.getByRole("complementary")).toBeVisible();
   const initial = queries[0]!;
+  const navigated = page.waitForResponse("**/api/aircraft?*");
   await page.getByRole("button", { name: "São Paulo", exact: true }).click();
+  await navigated;
   await expect(page.getByLabel("Map zoom")).toHaveText("11.0 / 18");
-  await expect(page.getByLabel("Inspect aircraft")).toHaveCount(0);
-  await expect(page.getByRole("complementary")).toHaveCount(0);
+  await expect(page.getByLabel("Inspect aircraft")).toHaveValue("abc001");
+  await expect(page.getByRole("complementary")).toBeVisible();
   expect(queries.length).toBeGreaterThan(1);
   const local = queries.at(-1)!;
   expect(

@@ -29,14 +29,12 @@ export default function Globe({ expire }: { expire: () => void }) {
   const controller = useRef<GlobeController | null>(null);
   const aircraft = useRef<AircraftPosition[]>([]);
   const route = useRef<Route | null>(null);
-  const airportPreview = useRef(false);
   const showRoute = useCallback((value: Route | null) => {
     route.current = value;
     controller.current?.setRoute(value);
   }, []);
   const showAirport = (airport: Airport) => {
     if (!located(airport)) return;
-    airportPreview.current = true;
     controller.current?.goTo({
       latitude: airport.latitude!,
       longitude: airport.longitude!,
@@ -48,7 +46,6 @@ export default function Globe({ expire }: { expire: () => void }) {
     useState<AircraftPosition | null>(null);
   const selection = useRef<string | null>(null);
   const selectAircraft = (id: string | null) => {
-    if (selection.current !== id) airportPreview.current = false;
     selection.current = id;
     setSelectedId(id);
   };
@@ -145,11 +142,11 @@ export default function Globe({ expire }: { expire: () => void }) {
       })
         .then((data) => {
           if (abort.signal.aborted || epoch !== feedEpoch.current) return;
-          // Airport navigation keeps the inspected observation until its normal
-          // expiry; it must not be refreshed from an unrelated viewport response.
-          const inspected = airportPreview.current
-            ? aircraft.current.find((p) => p.id === selection.current)
-            : undefined;
+          // Keep the selected flight when navigation takes it outside the feed's
+          // bounds. Preserve its observation timestamp so normal expiry still applies.
+          const inspected = aircraft.current.find(
+            (p) => p.id === selection.current,
+          );
           aircraft.current = freshAircraft(
             inspected && !data.aircraft.some((p) => p.id === inspected.id)
               ? [...data.aircraft, inspected]
@@ -232,7 +229,6 @@ export default function Globe({ expire }: { expire: () => void }) {
             feedEpoch.current++;
             setViewport(null);
             setFeedAttempt((value) => value + 1);
-            airportPreview.current = false;
             aircraft.current = [
               ...aircraft.current.filter((p) => p.id !== position.id),
               position,

@@ -102,6 +102,7 @@ test("search finds an offscreen flight and route airports remain inspectable", a
       },
     }),
   );
+  await page.clock.install();
   await page.goto("/app");
   const search = page.getByLabel("Find a flight");
   await expect(search).toBeVisible();
@@ -126,6 +127,24 @@ test("search finds an offscreen flight and route airports remain inspectable", a
   await page.getByRole("button", { name: "TEST123 · ABC123" }).click();
   await sameView;
   await expect(page.getByLabel("Inspect aircraft")).toHaveValue("abc123");
+  // Rotating away manually must preserve the selection and route, including
+  // after a periodic feed response that contains no aircraft in this viewport.
+  const canvas = page.getByRole("img", { name: "Interactive 3D Earth" });
+  await canvas.focus();
+  const rotated = page.waitForResponse((r) =>
+    r.url().includes("minimumLatitude="),
+  );
+  await page.keyboard.press("Home");
+  await rotated;
+  await expect(page.getByLabel("Inspect aircraft")).toHaveValue("abc123");
+  await expect(panel).toContainText("Guarulhos Airport");
+  const polled = page.waitForResponse((r) =>
+    r.url().includes("minimumLatitude="),
+  );
+  await page.clock.fastForward(11000);
+  await polled;
+  await expect(page.getByLabel("Inspect aircraft")).toHaveValue("abc123");
+  await expect(panel).toContainText("Guarulhos Airport");
   const response = page.waitForResponse((r) =>
     r.url().includes("minimumLatitude=-23"),
   );
