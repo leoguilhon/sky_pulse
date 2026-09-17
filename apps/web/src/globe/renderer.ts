@@ -1,6 +1,13 @@
 import { aircraftGeoJson } from "./aircraft-geojson";
 import { routeGeometry } from "./route-geometry";
 import { applyBasemapPalette } from "./basemap-palette";
+import { isolateBasemapLabels } from "./basemap-sources";
+import {
+  addWorldBasemap,
+  DETAIL_ZOOM,
+  WORLD_LAYER,
+  WORLD_SOURCE,
+} from "./world-basemap";
 import type { Route } from "./route-types";
 import {
   Map,
@@ -71,6 +78,7 @@ export async function createGlobe(
       0,
     ],
   };
+  isolateBasemapLabels(style);
   const labels = style.layers.filter((layer) => layer.type === "symbol");
   const originalFilters = new globalThis.Map(
     labels.map((layer) => [layer.id, layer.filter]),
@@ -248,6 +256,7 @@ export async function createGlobe(
       layer.paint = { ...layer.paint, "icon-opacity": 0.3 };
     }
   }
+  const surfaceSources = addWorldBasemap(style);
   style.sources[AIRCRAFT_SOURCE] = {
     type: "geojson",
     data: aircraftGeoJson([]),
@@ -415,7 +424,8 @@ export async function createGlobe(
       attributionControl: false,
       renderWorldCopies: false,
       canvasContextAttributes: { antialias: true },
-      maxTileCacheSize: 128,
+      // Retain recently visited regions when quickly reversing a drag or zoom.
+      maxTileCacheSize: 512,
       pixelRatio: Math.min(window.devicePixelRatio, 2),
       transformRequest: (url) => ({ url, credentials: "same-origin" }),
     });
@@ -424,8 +434,17 @@ export async function createGlobe(
       "3D rendering is unavailable. Enable hardware acceleration or try a browser with WebGL 2 support.",
     );
   }
-  map.addControl(new AttributionControl({ compact: false }), "bottom-right");
+  map.addControl(
+    new AttributionControl({
+      compact: false,
+      customAttribution: surfaceSources.length
+        ? '<a href="https://www.naturalearthdata.com/">Natural Earth</a>'
+        : undefined,
+    }),
+    "bottom-right",
+  );
   const canvas = map.getCanvas();
+  if (surfaceSources.length) canvas.style.visibility = "hidden";
   canvas.tabIndex = 0;
   canvas.setAttribute("role", "img");
   canvas.setAttribute("aria-label", "Interactive 3D Earth with live aircraft");
@@ -437,6 +456,25 @@ export async function createGlobe(
     zoom: map.getZoom(),
   });
   let disposed = false;
+  let showingWorld = true;
+  let worldReady = false;
+  const failedSurfaces = new Set<string>();
+  function showWorld(show: boolean) {
+    if (disposed || !surfaceSources.length || showingWorld === show) return;
+    showingWorld = show;
+    map.setPaintProperty(WORLD_LAYER, "raster-opacity-transition", {
+      duration: show ? 0 : 150,
+    });
+    map.setPaintProperty(WORLD_LAYER, "raster-opacity", show ? 1 : 0);
+  }
+  function updateWorld() {
+    if (disposed || !surfaceSources.length) return;
+    showWorld(
+      map.getZoom() < DETAIL_ZOOM ||
+        failedSurfaces.size > 0 ||
+        surfaceSources.some((id) => !map.isSourceLoaded(id)),
+    );
+  }
   let latestAircraft: AircraftPosition[] = [];
   let latestRoute: Route | null = null;
   function setRoute(route: Route | null) {
@@ -451,16 +489,20 @@ export async function createGlobe(
   let selectedId: string | null = null;
   let lastAircraftSampleReport = -Infinity;
   let lastReported = 0;
-  let lastFocusUpdate = 0;
   let focusKey = "";
   let detailsDirty = true;
   function updateFocus() {
-    if (disposed || !labels.length || !map.getLayer(labels[0]!.id)) return;
+    if (
+      disposed ||
+      map.isMoving() ||
+      !labels.length ||
+      !map.getLayer(labels[0]!.id)
+    )
+      return;
     const current = view();
     const key = `${current.latitude}/${current.longitude}/${current.zoom}/${host.clientWidth}/${host.clientHeight}`;
     if (key === focusKey) return;
     focusKey = key;
-    lastFocusUpdate = performance.now();
     const focus = labelFilter(current);
     for (const layer of labels)
       map.setFilter(layer.id, focusedFilter(layer.id, focus));
@@ -502,7 +544,11 @@ export async function createGlobe(
     animationFrame = 0;
     if (disposed || document.hidden) return;
     // Leave time for map workers and interaction when viewing dense global feeds.
-    const frameRate = latestAircraft.length > 5000 ? 15 : 30;
+    const frameRate = map.isMoving()
+      ? 10
+      : latestAircraft.length > 5000
+        ? 15
+        : 30;
     if (time - lastAnimation >= 1000 / frameRate) {
       updateAircraft();
       lastAnimation = time;
@@ -524,7 +570,7 @@ export async function createGlobe(
   function moved() {
     detailsDirty = true;
     if (performance.now() - lastReported > 100) report();
-    if (performance.now() - lastFocusUpdate > 200) updateFocus();
+    // Refine label focus on moveend, leaving workers free during gestures.
   }
   function goTo(target: View) {
     onLoading(true);
@@ -537,7 +583,8 @@ export async function createGlobe(
     });
   }
   function zoom(change: number) {
-    goTo({ ...view(), zoom: map.getZoom() + change });
+    const current = view();
+    goTo({ ...current, zoom: current.zoom + change });
   }
   function rotate(latitude: number, longitude: number) {
     const current = view();
@@ -590,9 +637,10 @@ export async function createGlobe(
   }
   map.on("click", (event) => selectAircraft(hitAircraft(event)));
   map.on("mousemove", (event) => {
+    if (map.isMoving()) return;
     canvas.style.cursor = hitAircraft(event) ? "pointer" : "grab";
   });
-  map.on("load", () => {
+  map.on("style.load", () => {
     for (const symbol of Object.keys(
       aircraftSymbols,
     ) as (keyof typeof aircraftSymbols)[]) {
@@ -605,13 +653,38 @@ export async function createGlobe(
       }
     }
   });
-  map.on("error", () => {
+  map.on("error", (event) => {
+    const sourceId =
+      "sourceId" in event && typeof event.sourceId === "string"
+        ? event.sourceId
+        : null;
+    if (sourceId && surfaceSources.includes(sourceId)) {
+      failedSurfaces.add(sourceId);
+      showWorld(true);
+    }
+    if (sourceId === WORLD_SOURCE) canvas.style.visibility = "";
     if (!disposed)
       onDetails(
         "Some map details could not be loaded. Check your connection, then reload the map.",
       );
   });
   map.on("load", report);
+  map.on("render", updateWorld);
+  map.on("sourcedataloading", (event) => {
+    if (surfaceSources.includes(event.sourceId)) showWorld(true);
+  });
+  map.on("sourcedata", (event) => {
+    if (
+      event.sourceId === WORLD_SOURCE &&
+      !worldReady &&
+      event.isSourceLoaded
+    ) {
+      worldReady = true;
+      canvas.style.visibility = "";
+      reportViewport();
+      updateAircraft();
+    }
+  });
   map.on("load", () => setRoute(latestRoute));
   map.on("load", reportViewport);
   map.on("moveend", reportViewport);
@@ -634,8 +707,11 @@ export async function createGlobe(
     if (disposed || !detailsDirty) return;
     detailsDirty = false;
     const names = map
-      .queryRenderedFeatures()
-      .filter((feature) => feature.layer.id.startsWith("place_"))
+      .queryRenderedFeatures({
+        layers: labels
+          .filter((layer) => layer.id.startsWith("place_"))
+          .map((layer) => layer.id),
+      })
       .sort((a, b) => {
         const distance = (feature: typeof a) => {
           if (feature.geometry.type !== "Point") return Infinity;
